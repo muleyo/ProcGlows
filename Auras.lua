@@ -1,10 +1,5 @@
 local _, addon = ...
 
--- Default aura entries per class (used to seed the DB on first run)
-function addon:GetClassAuraDefaults(class)
-    return nil
-end
-
 -- Default item entries (used to seed the DB on first run)
 function addon:GetItemDefaults()
     return {
