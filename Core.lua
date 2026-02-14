@@ -185,7 +185,7 @@ function addon:OnEvent()
         local buttons = addon:FindButtonsByItemID(item.itemID)
 
         for _, button in ipairs(buttons) do
-            if C_Item.IsUsableItem(item.itemID) then
+            if C_Item.IsUsableItem(item.itemID) and not button.cooldown:IsShown() then
                 if not HasProcGlow(button) then
                     ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
                 end
