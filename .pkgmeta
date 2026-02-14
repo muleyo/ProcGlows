@@ -12,6 +12,6 @@ externals:
   Libs/CallbackHandler-1.0: https://repos.wowace.com/wow/callbackhandler/trunk/CallbackHandler-1.0
   Libs/LibStub: https://repos.wowace.com/wow/libstub/trunk
   Libs/LibDeflate: https://github.com/SafeteeWoW/LibDeflate.git
-  Libs/LibButtonGlow-1.0: https://repos.curseforge.com/wow/libbuttonglow-1-0
+  Libs/LibCustomGlow-1.0: https://github.com/Stanzilla/LibCustomGlow.git
 ignore:
   - readme.md

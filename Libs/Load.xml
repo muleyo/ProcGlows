@@ -12,7 +12,6 @@
     <Include file="AceConfig-3.0\AceConfig-3.0.xml" />
     <Include file="AceHook-3.0\AceHook-3.0.xml" />
     <Include file="AceSerializer-3.0\AceSerializer-3.0.xml" />
-    <Include file="AceTimer-3.0\AceTimer-3.0.xml" />
     <Include file="LibDeflate\lib.xml" />
     <Include file="LibCustomGlow-1.0\LibCustomGlow-1.0.xml" />
 </Ui>
