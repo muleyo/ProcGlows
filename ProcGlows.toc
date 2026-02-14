@@ -6,6 +6,9 @@
 ## X-Curse-Project-ID: 1461238
 ## SavedVariables: muleyoProcGlowDB
 
+# Init
+Init.lua
+
 # Libs
 Libs\Load.xml
 
