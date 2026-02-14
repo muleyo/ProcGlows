@@ -6,15 +6,27 @@ addon.events:RegisterEvent("SPELL_UPDATE_USABLE")
 addon.events:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 addon.events:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 addon.events:RegisterEvent("PLAYER_REGEN_ENABLED")
+addon.events:RegisterEvent("PLAYER_UNGHOST")
+addon.events:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+addon.events:RegisterEvent("PLAYER_TALENT_UPDATE")
+addon.events:RegisterEvent("PLAYER_ENTERING_WORLD")
 
--- ─── Glow via LibCustomGlow ProcGlow (modern Blizzard flipbook proc glow) ───
-local LCG = LibStub("LibCustomGlow-1.0")
+local itemSlotCache = {}
+local LCG = addon.LCG
 local activeGlows = {}
-local wasOnGCD = {}
 local GLOW_KEY = "ProcGlows"
-local itemGlowButtons = {} -- buttons currently claimed by an item glow (items take priority)
+local spellButtonCache = {}
+local auraAnchorCache = {}
+local itemAnchorCache = {}
+local spellAnchorCache = {}
+local spellCacheDirty = true
+local itemCacheDirty = true
+local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
+                         "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button",
+                         "MultiBar8Button"}
+local MAX_ACTION_SLOT = 180
 
-local function ShowProcGlow(button, r, g, b)
+function addon:ShowProcGlow(button, r, g, b)
     LCG.ProcGlow_Start(button, {
         color = {r, g, b, 1},
         startAnim = true,
@@ -22,26 +34,15 @@ local function ShowProcGlow(button, r, g, b)
     })
 end
 
-local function HideProcGlow(button)
+function addon:HideProcGlow(button)
     LCG.ProcGlow_Stop(button, GLOW_KEY)
 end
 
-local function HasProcGlow(button)
+function addon:HasProcGlow(button)
     return button["_ProcGlow" .. GLOW_KEY] ~= nil
 end
 
--- ─── Gather every action button we know about ───────────────────────────────
-local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
-                         "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button",
-                         "MultiBar8Button"}
-
--- ─── Find all buttons whose .action matches a given slot (inline compare) ───
--- IMPORTANT: We never store button.action in a variable.  In TWW it is a
--- "forbidden value" (secret number).  Storing it and passing it to any API
--- (HasAction, GetActionInfo, table index, …) taints the secure action-bar
--- execution path.  Direct comparison  button.action == <normal value>  returns
--- a clean boolean and is safe.
-local function FindButtonsForSlot(slot)
+function addon:FindButtonsForSlot(slot)
     local result = {}
     local seen = {}
     if ActionBarButtonEventsFrame and ActionBarButtonEventsFrame.frames then
@@ -64,10 +65,7 @@ local function FindButtonsForSlot(slot)
     return result
 end
 
--- ─── Taint-free button lookup ───────────────────────────────────────────────
--- Uses C_ActionBar.FindSpellActionButtons (returns clean slot numbers) and
--- then matches those slots to buttons via inline comparison only.
-function addon:FindButtonsBySpellID(spellID)
+function addon:LookupSpellButtons(spellID)
     local result = {}
     local seen = {}
 
@@ -93,7 +91,7 @@ function addon:FindButtonsBySpellID(spellID)
 
     -- For each slot, find every button that owns it
     for _, slot in ipairs(allSlots) do
-        local buttons = FindButtonsForSlot(slot)
+        local buttons = addon:FindButtonsForSlot(slot)
         for _, button in ipairs(buttons) do
             if not seen[button] then
                 seen[button] = true
@@ -104,15 +102,26 @@ function addon:FindButtonsBySpellID(spellID)
     return result
 end
 
--- ─── Item slot cache (scanned out of combat) ───────────────────────────────
--- We cache itemID -> list of slot numbers (not button references), because
--- button.action is dynamic and can change with bar paging / overrides.
--- Slots are resolved to buttons at lookup time via FindButtonsForSlot.
-local MAX_ACTION_SLOT = 180
-local itemSlotCache = {}
-local itemCacheDirty = true
+function addon:FindButtonsBySpellID(spellID)
+    if spellCacheDirty then
+        wipe(spellButtonCache)
+        spellCacheDirty = false
+    end
+    if not spellButtonCache[spellID] then
+        spellButtonCache[spellID] = addon:LookupSpellButtons(spellID)
+    end
+    return spellButtonCache[spellID]
+end
 
-local function ScanItemButtons()
+function addon:InvalidateAllCaches()
+    spellCacheDirty = true
+    itemCacheDirty = true
+    addon:RebuildAuraAnchorCache()
+    addon:RebuildSpellButtonCache()
+    addon:RebuildItemButtonCache()
+end
+
+function addon:ScanItemButtons()
     if InCombatLockdown() then
         itemCacheDirty = true
         return
@@ -132,12 +141,9 @@ local function ScanItemButtons()
     itemCacheDirty = false
 end
 
--- Initial scan (runs at load, out of combat)
-ScanItemButtons()
-
 function addon:FindButtonsByItemID(itemID)
     if itemCacheDirty and not InCombatLockdown() then
-        ScanItemButtons()
+        addon:ScanItemButtons()
     end
     local slots = itemSlotCache[itemID]
     if not slots then
@@ -146,7 +152,7 @@ function addon:FindButtonsByItemID(itemID)
     local result = {}
     local seen = {}
     for _, slot in ipairs(slots) do
-        local buttons = FindButtonsForSlot(slot)
+        local buttons = addon:FindButtonsForSlot(slot)
         for _, button in ipairs(buttons) do
             if not seen[button] then
                 seen[button] = true
@@ -157,7 +163,41 @@ function addon:FindButtonsByItemID(itemID)
     return result
 end
 
-function addon:OnUpdate()
+function addon:RebuildAuraAnchorCache()
+    wipe(auraAnchorCache)
+    if not addon.Auras then
+        return
+    end
+    -- Force spell cache refresh so LookupSpellButtons gets fresh data
+    spellCacheDirty = true
+    for buffSpellID, auraData in pairs(addon.Auras) do
+        auraAnchorCache[buffSpellID] = addon:FindButtonsBySpellID(auraData.anchorSpellID)
+    end
+end
+
+function addon:RebuildItemButtonCache()
+    wipe(itemAnchorCache)
+    if not addon.Items then
+        return
+    end
+    for key, item in pairs(addon.Items) do
+        itemAnchorCache[item.itemID] = addon:FindButtonsByItemID(item.itemID)
+    end
+end
+
+function addon:RebuildSpellButtonCache()
+    wipe(spellAnchorCache)
+    if not addon.Spells then
+        return
+    end
+    -- Force spell cache refresh so LookupSpellButtons gets fresh data
+    spellCacheDirty = true
+    for spellID, _ in pairs(addon.Spells) do
+        spellAnchorCache[spellID] = addon:FindButtonsBySpellID(spellID)
+    end
+end
+
+function addon:CheckAuras()
     if not addon.Auras then
         return
     end
@@ -167,22 +207,22 @@ function addon:OnUpdate()
             local spellID = aura:GetBaseSpellID()
             if spellID and addon.Auras[spellID] then
                 local auraData = addon.Auras[spellID]
-                local buttons = addon:FindButtonsBySpellID(auraData.anchorSpellID)
-                local shouldShow = auraData.shouldShow
+                local buttons = auraAnchorCache[spellID]
 
-                if not shouldShow then
+                if not auraData.shouldShow then
                     aura:Hide()
                 end
 
-                for _, button in ipairs(buttons) do
-                    if itemGlowButtons[button] then
-                        -- Item glow has priority; skip aura processing
-                    elseif aura.Cooldown:IsShown() then
-                        if not HasProcGlow(button) then
-                            ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
+                if buttons then
+                    for _, button in ipairs(buttons) do
+                        if aura.Cooldown:IsShown() then
+                            if not addon:HasProcGlow(button) then
+                                addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
+
+                            end
+                        else
+                            addon:HideProcGlow(button)
                         end
-                    else
-                        HideProcGlow(button)
                     end
                 end
             end
@@ -190,23 +230,24 @@ function addon:OnUpdate()
     end
 end
 
-function addon:OnEvent()
+function addon:CheckItemCooldowns()
     if not addon.Items then
         return
     end
 
-    wipe(itemGlowButtons)
     for _, item in pairs(addon.Items) do
-        local buttons = addon:FindButtonsByItemID(item.itemID)
+        local buttons = itemAnchorCache[item.itemID]
 
-        for _, button in ipairs(buttons) do
-            if GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and (not button.cooldown:IsShown()) then
-                itemGlowButtons[button] = true
-                if not HasProcGlow(button) then
-                    ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
+        if buttons then
+            for _, button in ipairs(buttons) do
+                if GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and
+                    (not button.cooldown:IsShown()) then
+                    if not addon:HasProcGlow(button) then
+                        addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
+                    end
+                else
+                    addon:HideProcGlow(button)
                 end
-            else
-                HideProcGlow(button)
             end
         end
     end
@@ -218,101 +259,38 @@ function addon:CheckSpellCooldowns()
     end
 
     for spellID, spellData in pairs(addon.Spells) do
-        local buttons = addon:FindButtonsBySpellID(spellID)
-        local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
-        local isOnGCD = cooldownInfo and cooldownInfo.isOnGCD
-        local justLeftGCD = wasOnGCD[spellID] and not isOnGCD
-        wasOnGCD[spellID] = isOnGCD
-
-        for _, button in ipairs(buttons) do
-            if itemGlowButtons[button] then
-                -- Item glow has priority; skip spell processing for this button
-                -- Allow showing glows during GCD, skip hide on the frame GCD ends
-            elseif C_Spell.IsSpellUsable(spellID) and (isOnGCD or justLeftGCD or not button.cooldown:IsShown()) then
-                local alertMissing = activeGlows[button] and not HasProcGlow(button)
-                if not activeGlows[button] or alertMissing then
-                    activeGlows[button] = true
-                    ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b)
-                end
-            elseif not isOnGCD and not justLeftGCD then
-                if activeGlows[button] then
-                    activeGlows[button] = nil
-                    HideProcGlow(button)
+        local buttons = spellAnchorCache[spellID]
+        if buttons then
+            for _, button in ipairs(buttons) do
+                if C_Spell.IsSpellUsable(spellID) and not button.cooldown:IsShown() then
+                    if not activeGlows[button] or not addon:HasProcGlow(button) then
+                        activeGlows[button] = true
+                        addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b)
+                    end
+                else
+                    if activeGlows[button] then
+                        activeGlows[button] = nil
+                        addon:HideProcGlow(button)
+                    end
                 end
             end
         end
     end
 end
 
--- ─── Debug slash command ─────────────────────────────────────────────────────
-SLASH_PGDEBUG1 = "/pgdebug"
-SlashCmdList["PGDEBUG"] = function()
-    print("|cff00ff00[ProcGlows Debug]|r Scanning action slots 1-180...")
-    local buttonCount = 0
-    for slot = 1, MAX_ACTION_SLOT do
-        if HasAction(slot) then
-            local actionType, id = GetActionInfo(slot)
-            local buttons = FindButtonsForSlot(slot)
-            if #buttons > 0 then
-                local names = {}
-                for _, btn in ipairs(buttons) do
-                    names[#names + 1] = btn:GetName() or "unnamed"
-                    buttonCount = buttonCount + 1
-                end
-                print("  slot=" .. slot .. "  " .. tostring(actionType) .. "/" .. tostring(id) .. "  buttons: " ..
-                          table.concat(names, ", "))
-            end
-        end
+-- Hooks
+addon.events:HookScript("OnEvent", function(self, event, ...)
+    if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "ACTIONBAR_SLOT_CHANGED" then
+        addon:InvalidateAllCaches()
+        return
     end
-    print("  Total buttons matched: " .. buttonCount)
-
-    if addon.Spells then
-        print("|cff00ff00[ProcGlows]|r Tracked spells:")
-        for spellID, _ in pairs(addon.Spells) do
-            local buttons = addon:FindButtonsBySpellID(spellID)
-            local spellName = C_Spell.GetSpellInfo(spellID)
-            spellName = spellName and spellName.name or tostring(spellID)
-            print("  Spell " .. spellID .. " (" .. spellName .. "): found " .. #buttons .. " buttons")
-            for _, btn in ipairs(buttons) do
-                print("    -> " .. (btn:GetName() or "unnamed"))
-            end
-        end
-    end
-
-    if addon.Auras then
-        print("|cff00ff00[ProcGlows]|r Tracked auras:")
-        for spellID, auraData in pairs(addon.Auras) do
-            local buttons = addon:FindButtonsBySpellID(auraData.anchorSpellID)
-            local spellName = C_Spell.GetSpellInfo(spellID)
-            spellName = spellName and spellName.name or tostring(spellID)
-            print("  Aura " .. spellID .. " (" .. spellName .. ") anchor=" .. auraData.anchorSpellID .. ": found " ..
-                      #buttons .. " buttons")
-            for _, btn in ipairs(buttons) do
-                print("    -> " .. (btn:GetName() or "unnamed"))
-            end
-        end
-    end
-
-    if addon.Items then
-        print("|cff00ff00[ProcGlows]|r Tracked items:")
-        for key, item in pairs(addon.Items) do
-            local buttons = addon:FindButtonsByItemID(item.itemID)
-            print("  Item " .. item.itemID .. ": found " .. #buttons .. " buttons")
-        end
-    end
-end
-
--- Hook BuffIconCooldownViewer to track auras 
-BuffIconCooldownViewer:HookScript("OnUpdate", addon.OnUpdate)
-
-addon.events:SetScript("OnEvent", function(self, event, ...)
-    if event == "ACTIONBAR_SLOT_CHANGED" then
-        itemCacheDirty = true
+    if event == "PLAYER_ENTERING_WORLD" then
+        addon:InvalidateAllCaches()
         return
     end
     if event == "PLAYER_REGEN_ENABLED" then
         if itemCacheDirty then
-            ScanItemButtons()
+            addon:ScanItemButtons()
         end
         return
     end
@@ -320,6 +298,8 @@ addon.events:SetScript("OnEvent", function(self, event, ...)
         addon:CheckSpellCooldowns()
         return
     end
-    addon:OnEvent()
+    addon:CheckItemCooldowns()
     addon:CheckSpellCooldowns()
 end)
+
+BuffIconCooldownViewer:HookScript("OnUpdate", addon.CheckAuras)
