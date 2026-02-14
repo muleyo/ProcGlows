@@ -3,7 +3,7 @@
 ## Version: @project-version@
 ## Title: |cff009cffmuleyo's|r |cffffd100ProcGlows|r
 ## IconTexture: Interface\Icons\Spell_Holy_SurgeOfLight
-## X-Curse-Project-ID: 737373
+## X-Curse-Project-ID: 1461238
 ## Category-enUS: User Interface
 ## Category-deDE: Benutzerinterface
 ## Category-esES: Interfaz de usuario
