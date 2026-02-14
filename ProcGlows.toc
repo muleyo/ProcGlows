@@ -1,0 +1,33 @@
+## Interface: 120000, 120001
+## Author: muleyo
+## Version: @project-version@
+## Title: |cff009cffmuleyo's|r |cffffd100ProcGlows|r
+## IconTexture: Interface\Icons\Spell_Holy_SurgeOfLight
+## X-Curse-Project-ID: 737373
+## Category-enUS: User Interface
+## Category-deDE: Benutzerinterface
+## Category-esES: Interfaz de usuario
+## Category-esMX: Interfaz de usuario
+## Category-frFR: Interface utilisateur
+## Category-itIT: Interfaccia utente
+## Category-koKR: 사용자 인터페이스
+## Category-ptBR: Interface do usuário
+## Category-ruRU: Интерфейс пользователя
+## Category-zhCN: 用户界面
+## Category-zhTW: 使用者介面
+## SavedVariables: muleyoProcGlowDB
+
+# Libs
+Libs\Load.xml
+
+## 
+Hide_AB_Animations.lua
+
+## Auras
+Auras.lua
+
+## Config
+Config.lua
+
+## Core
+Core.lua
