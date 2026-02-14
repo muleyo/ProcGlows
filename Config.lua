@@ -187,6 +187,17 @@ function addon:RebuildTables()
             end
         end
     end
+
+    -- Rebuild button caches so they reflect the updated tables
+    if self.RebuildAuraAnchorCache then
+        self:RebuildAuraAnchorCache()
+    end
+    if self.RebuildSpellButtonCache then
+        self:RebuildSpellButtonCache()
+    end
+    if self.RebuildItemButtonCache then
+        self:RebuildItemButtonCache()
+    end
 end
 
 -- ─── Import / Export helpers ─────────────────────────────────────────────────
