@@ -12,6 +12,7 @@ local LCG = LibStub("LibCustomGlow-1.0")
 local activeGlows = {}
 local wasOnGCD = {}
 local GLOW_KEY = "ProcGlows"
+local itemGlowButtons = {} -- buttons currently claimed by an item glow (items take priority)
 
 local function ShowProcGlow(button, r, g, b)
     LCG.ProcGlow_Start(button, {
@@ -103,11 +104,12 @@ function addon:FindButtonsBySpellID(spellID)
     return result
 end
 
--- ─── Item button cache (scanned out of combat) ─────────────────────────────
--- We iterate known action slots (1–180) so we never need to read button.action
--- as a variable.  GetActionInfo(slot) with a plain number is taint-safe.
+-- ─── Item slot cache (scanned out of combat) ───────────────────────────────
+-- We cache itemID -> list of slot numbers (not button references), because
+-- button.action is dynamic and can change with bar paging / overrides.
+-- Slots are resolved to buttons at lookup time via FindButtonsForSlot.
 local MAX_ACTION_SLOT = 180
-local itemButtonCache = {}
+local itemSlotCache = {}
 local itemCacheDirty = true
 
 local function ScanItemButtons()
@@ -115,20 +117,15 @@ local function ScanItemButtons()
         itemCacheDirty = true
         return
     end
-    wipe(itemButtonCache)
+    wipe(itemSlotCache)
     for slot = 1, MAX_ACTION_SLOT do
         if HasAction(slot) then
             local actionType, id = GetActionInfo(slot)
             if actionType == "item" and id then
-                local buttons = FindButtonsForSlot(slot)
-                if #buttons > 0 then
-                    if not itemButtonCache[id] then
-                        itemButtonCache[id] = {}
-                    end
-                    for _, btn in ipairs(buttons) do
-                        itemButtonCache[id][#itemButtonCache[id] + 1] = btn
-                    end
+                if not itemSlotCache[id] then
+                    itemSlotCache[id] = {}
                 end
+                itemSlotCache[id][#itemSlotCache[id] + 1] = slot
             end
         end
     end
@@ -142,7 +139,22 @@ function addon:FindButtonsByItemID(itemID)
     if itemCacheDirty and not InCombatLockdown() then
         ScanItemButtons()
     end
-    return itemButtonCache[itemID] or {}
+    local slots = itemSlotCache[itemID]
+    if not slots then
+        return {}
+    end
+    local result = {}
+    local seen = {}
+    for _, slot in ipairs(slots) do
+        local buttons = FindButtonsForSlot(slot)
+        for _, button in ipairs(buttons) do
+            if not seen[button] then
+                seen[button] = true
+                result[#result + 1] = button
+            end
+        end
+    end
+    return result
 end
 
 function addon:OnUpdate()
@@ -163,7 +175,9 @@ function addon:OnUpdate()
                 end
 
                 for _, button in ipairs(buttons) do
-                    if aura.Cooldown:IsShown() then
+                    if itemGlowButtons[button] then
+                        -- Item glow has priority; skip aura processing
+                    elseif aura.Cooldown:IsShown() then
                         if not HasProcGlow(button) then
                             ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
                         end
@@ -181,11 +195,13 @@ function addon:OnEvent()
         return
     end
 
+    wipe(itemGlowButtons)
     for _, item in pairs(addon.Items) do
         local buttons = addon:FindButtonsByItemID(item.itemID)
 
         for _, button in ipairs(buttons) do
-            if C_Item.IsUsableItem(item.itemID) and not button.cooldown:IsShown() then
+            if GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and (not button.cooldown:IsShown()) then
+                itemGlowButtons[button] = true
                 if not HasProcGlow(button) then
                     ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
                 end
@@ -209,8 +225,10 @@ function addon:CheckSpellCooldowns()
         wasOnGCD[spellID] = isOnGCD
 
         for _, button in ipairs(buttons) do
-            -- Allow showing glows during GCD, skip hide on the frame GCD ends
-            if C_Spell.IsSpellUsable(spellID) and (isOnGCD or justLeftGCD or not button.cooldown:IsShown()) then
+            if itemGlowButtons[button] then
+                -- Item glow has priority; skip spell processing for this button
+                -- Allow showing glows during GCD, skip hide on the frame GCD ends
+            elseif C_Spell.IsSpellUsable(spellID) and (isOnGCD or justLeftGCD or not button.cooldown:IsShown()) then
                 local alertMissing = activeGlows[button] and not HasProcGlow(button)
                 if not activeGlows[button] or alertMissing then
                     activeGlows[button] = true
