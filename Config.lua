@@ -12,7 +12,7 @@ local defaults = {
     profile = {
         auras = {
             -- keyed by string spellID of the buff/proc
-            -- each entry: { anchorSpellID, color = {r,g,b}, shouldShow }
+            -- each entry: { anchorSpellID, color = {r,g,b}, shouldShow, glowIcon }
         },
         items = {
             -- keyed by string itemID
@@ -141,7 +141,8 @@ function addon:RebuildTables()
                                 g = entry.color.g,
                                 b = entry.color.b
                             },
-                            shouldShow = entry.shouldShow
+                            shouldShow = entry.shouldShow,
+                            glowIcon = entry.glowIcon
                         }
                     end
                 end
@@ -313,7 +314,8 @@ local newAura = {
     r = 1,
     g = 1,
     b = 0,
-    shouldShow = true
+    shouldShow = true,
+    glowIcon = false
 }
 
 -- Scan BuffIconCooldownViewer for available buff/proc spell IDs
@@ -432,6 +434,18 @@ local function GetOptions()
                                     newAura.shouldShow = v
                                 end
                             },
+                            glowIcon = {
+                                type = "toggle",
+                                name = "Glow Aura Icon",
+                                desc = "Show a proc glow on the aura icon itself in the CooldownManager.",
+                                order = 5,
+                                get = function()
+                                    return newAura.glowIcon
+                                end,
+                                set = function(_, v)
+                                    newAura.glowIcon = v
+                                end
+                            },
                             add = {
                                 type = "execute",
                                 name = "Add Aura",
@@ -457,7 +471,8 @@ local function GetOptions()
                                             g = newAura.g,
                                             b = newAura.b
                                         },
-                                        shouldShow = newAura.shouldShow
+                                        shouldShow = newAura.shouldShow,
+                                        glowIcon = newAura.glowIcon
                                     }
                                     addon:RebuildTables()
                                     -- reset
@@ -467,6 +482,7 @@ local function GetOptions()
                                     newAura.g = 1;
                                     newAura.b = 0
                                     newAura.shouldShow = false
+                                    newAura.glowIcon = false
                                     print(
                                         "|cff00ff00[ProcGlows]|r Aura added: " .. SpellName(buffID) .. " (" .. buffID ..
                                             ")")
@@ -840,6 +856,19 @@ local function GetOptions()
                                 end,
                                 set = function(_, v)
                                     entry.shouldShow = v
+                                    addon:RebuildTables()
+                                end
+                            },
+                            glowIcon = {
+                                type = "toggle",
+                                name = "Glow Aura Icon",
+                                desc = "Show a proc glow on the aura icon itself in the CooldownManager.",
+                                order = 5,
+                                get = function()
+                                    return entry.glowIcon
+                                end,
+                                set = function(_, v)
+                                    entry.glowIcon = v
                                     addon:RebuildTables()
                                 end
                             },

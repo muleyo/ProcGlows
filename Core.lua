@@ -21,6 +21,7 @@ local itemAnchorCache = {}
 local spellAnchorCache = {}
 local spellCacheDirty = true
 local itemCacheDirty = true
+local wasOnGCD = {}
 local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
                          "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button",
                          "MultiBar8Button"}
@@ -213,12 +214,22 @@ function addon:CheckAuras()
                     aura:Hide()
                 end
 
+                -- Glow on the aura icon itself
+                if auraData.glowIcon then
+                    if aura.Cooldown:IsShown() then
+                        if not addon:HasProcGlow(aura) then
+                            addon:ShowProcGlow(aura, auraData.color.r, auraData.color.g, auraData.color.b)
+                        end
+                    else
+                        addon:HideProcGlow(aura)
+                    end
+                end
+
                 if buttons then
                     for _, button in ipairs(buttons) do
                         if aura.Cooldown:IsShown() then
                             if not addon:HasProcGlow(button) then
                                 addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
-
                             end
                         else
                             addon:HideProcGlow(button)
@@ -261,8 +272,12 @@ function addon:CheckSpellCooldowns()
     for spellID, spellData in pairs(addon.Spells) do
         local buttons = spellAnchorCache[spellID]
         if buttons then
+            local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
             for _, button in ipairs(buttons) do
-                if C_Spell.IsSpellUsable(spellID) and not button.cooldown:IsShown() then
+                local onCooldown = button.cooldown:IsShown() and not cooldownInfo.isOnGCD
+                local shouldGlow = C_Spell.IsSpellUsable(spellID) and not onCooldown
+
+                if shouldGlow then
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
                         activeGlows[button] = true
                         addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b)
@@ -280,18 +295,9 @@ end
 
 -- Hooks
 addon.events:HookScript("OnEvent", function(self, event, ...)
-    if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "ACTIONBAR_SLOT_CHANGED" then
+    if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "ACTIONBAR_SLOT_CHANGED" or
+        event == "PLAYER_ENTERING_WORLD" then
         addon:InvalidateAllCaches()
-        return
-    end
-    if event == "PLAYER_ENTERING_WORLD" then
-        addon:InvalidateAllCaches()
-        return
-    end
-    if event == "PLAYER_REGEN_ENABLED" then
-        if itemCacheDirty then
-            addon:ScanItemButtons()
-        end
         return
     end
     if event == "SPELL_UPDATE_COOLDOWN" then
@@ -299,7 +305,6 @@ addon.events:HookScript("OnEvent", function(self, event, ...)
         return
     end
     addon:CheckItemCooldowns()
-    addon:CheckSpellCooldowns()
 end)
 
 BuffIconCooldownViewer:HookScript("OnUpdate", addon.CheckAuras)
