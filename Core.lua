@@ -81,11 +81,14 @@ local function CollectThirdPartyButtons()
 end
 
 function addon:ShowProcGlow(button, r, g, b)
-    LCG.ProcGlow_Start(button, {
-        color = {r, g, b, 1},
+    local opts = {
         startAnim = true,
         key = GLOW_KEY
-    })
+    }
+    if r then
+        opts.color = {r, g, b, 1}
+    end
+    LCG.ProcGlow_Start(button, opts)
     allGlowingButtons[button] = true
 end
 
@@ -331,7 +334,11 @@ function addon:CheckAuras()
                             C_Timer.After(0, function()
                                 aura._ProcGlowPending = nil
                                 if aura.Cooldown:IsShown() and not addon:HasProcGlow(aura) then
-                                    addon:ShowProcGlow(aura, auraData.color.r, auraData.color.g, auraData.color.b)
+                                    if auraData.useDefaultColor then
+                                        addon:ShowProcGlow(aura)
+                                    else
+                                        addon:ShowProcGlow(aura, auraData.color.r, auraData.color.g, auraData.color.b)
+                                    end
                                 end
                             end)
                         end
@@ -345,7 +352,11 @@ function addon:CheckAuras()
                     for _, button in ipairs(buttons) do
                         if aura.Cooldown:IsShown() and not suppressed then
                             if not addon:HasProcGlow(button) then
-                                addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
+                                if auraData.useDefaultColor then
+                                    addon:ShowProcGlow(button)
+                                else
+                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
+                                end
                             end
                         else
                             addon:HideProcGlow(button)
@@ -372,7 +383,11 @@ function addon:CheckItemCooldowns()
                 if not suppressed and GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and
                     (not button.cooldown:IsShown()) then
                     if not addon:HasProcGlow(button) then
-                        addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
+                        if item.useDefaultColor then
+                            addon:ShowProcGlow(button)
+                        else
+                            addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
+                        end
                     end
                 else
                     addon:HideProcGlow(button)
@@ -400,7 +415,11 @@ function addon:CheckSpellCooldowns()
                 if shouldGlow then
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
                         activeGlows[button] = true
-                        addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b)
+                        if spellData.useDefaultColor then
+                            addon:ShowProcGlow(button)
+                        else
+                            addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b)
+                        end
                     end
                 else
                     if activeGlows[button] then

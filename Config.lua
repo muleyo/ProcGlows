@@ -1,3 +1,4 @@
+---@diagnostic disable
 local addonName, addon = ...
 
 local AceConfig = LibStub("AceConfig-3.0")
@@ -143,7 +144,8 @@ function addon:RebuildTables()
                                 b = entry.color.b
                             },
                             shouldShow = entry.shouldShow,
-                            glowIcon = entry.glowIcon
+                            glowIcon = entry.glowIcon,
+                            useDefaultColor = entry.useDefaultColor
                         }
                     end
                 end
@@ -163,7 +165,8 @@ function addon:RebuildTables()
                         r = entry.color.r,
                         g = entry.color.g,
                         b = entry.color.b
-                    }
+                    },
+                    useDefaultColor = entry.useDefaultColor
                 }
             end
         end
@@ -182,7 +185,8 @@ function addon:RebuildTables()
                                 r = entry.color.r,
                                 g = entry.color.g,
                                 b = entry.color.b
-                            }
+                            },
+                            useDefaultColor = entry.useDefaultColor
                         }
                     end
                 end
@@ -320,7 +324,8 @@ local newAura = {
     g = 1,
     b = 0,
     shouldShow = true,
-    glowIcon = false
+    glowIcon = false,
+    useDefaultColor = true
 }
 
 -- Scan BuffIconCooldownViewer for available buff/proc spell IDs
@@ -348,13 +353,15 @@ local newItem = {
     itemID = "",
     r = 0.5,
     g = 0.5,
-    b = 1
+    b = 1,
+    useDefaultColor = true
 }
 local newSpell = {
     spellID = "",
     r = 0,
     g = 1,
-    b = 0
+    b = 0,
+    useDefaultColor = true
 }
 
 -- ─── Options table ───────────────────────────────────────────────────────────
@@ -418,6 +425,9 @@ local function GetOptions()
                                 name = "Glow Color",
                                 order = 3,
                                 hasAlpha = false,
+                                disabled = function()
+                                    return newAura.useDefaultColor
+                                end,
                                 get = function()
                                     return newAura.r, newAura.g, newAura.b
                                 end,
@@ -425,6 +435,18 @@ local function GetOptions()
                                     newAura.r = r
                                     newAura.g = g
                                     newAura.b = b
+                                end
+                            },
+                            useDefaultColor = {
+                                type = "toggle",
+                                name = "Use Default Color",
+                                desc = "Use the default proc glow color instead of a custom one.",
+                                order = 3.5,
+                                get = function()
+                                    return newAura.useDefaultColor
+                                end,
+                                set = function(_, v)
+                                    newAura.useDefaultColor = v
                                 end
                             },
                             shouldShow = {
@@ -454,7 +476,7 @@ local function GetOptions()
                             add = {
                                 type = "execute",
                                 name = "Add Aura",
-                                order = 5,
+                                order = 6,
                                 width = "normal",
                                 func = function()
                                     local buffID = tonumber(newAura.buffSpellID)
@@ -477,17 +499,19 @@ local function GetOptions()
                                             b = newAura.b
                                         },
                                         shouldShow = newAura.shouldShow,
-                                        glowIcon = newAura.glowIcon
+                                        glowIcon = newAura.glowIcon,
+                                        useDefaultColor = newAura.useDefaultColor
                                     }
                                     addon:RebuildTables()
                                     -- reset
                                     newAura.buffSpellID = ""
                                     newAura.anchorSpellID = ""
-                                    newAura.r = 1;
-                                    newAura.g = 1;
+                                    newAura.r = 1
+                                    newAura.g = 1
                                     newAura.b = 0
                                     newAura.shouldShow = false
                                     newAura.glowIcon = false
+                                    newAura.useDefaultColor = true
                                     print(
                                         "|cff00ff00[ProcGlows]|r Aura added: " .. SpellName(buffID) .. " (" .. buffID ..
                                             ")")
@@ -535,6 +559,9 @@ local function GetOptions()
                                 name = "Glow Color",
                                 order = 2,
                                 hasAlpha = false,
+                                disabled = function()
+                                    return newItem.useDefaultColor
+                                end,
                                 get = function()
                                     return newItem.r, newItem.g, newItem.b
                                 end,
@@ -542,6 +569,18 @@ local function GetOptions()
                                     newItem.r = r
                                     newItem.g = g
                                     newItem.b = b
+                                end
+                            },
+                            useDefaultColor = {
+                                type = "toggle",
+                                name = "Use Default Color",
+                                desc = "Use the default proc glow color instead of a custom one.",
+                                order = 2.5,
+                                get = function()
+                                    return newItem.useDefaultColor
+                                end,
+                                set = function(_, v)
+                                    newItem.useDefaultColor = v
                                 end
                             },
                             add = {
@@ -561,13 +600,15 @@ local function GetOptions()
                                             r = newItem.r,
                                             g = newItem.g,
                                             b = newItem.b
-                                        }
+                                        },
+                                        useDefaultColor = newItem.useDefaultColor
                                     }
                                     addon:RebuildTables()
                                     newItem.itemID = ""
                                     newItem.r = 0.5;
                                     newItem.g = 0.5;
                                     newItem.b = 1
+                                    newItem.useDefaultColor = true
                                     print("|cff00ff00[ProcGlows]|r Item added: " .. ItemName(id) .. " (" .. id .. ")")
                                 end
                             }
@@ -612,6 +653,9 @@ local function GetOptions()
                                 name = "Glow Color",
                                 order = 2,
                                 hasAlpha = false,
+                                disabled = function()
+                                    return newSpell.useDefaultColor
+                                end,
                                 get = function()
                                     return newSpell.r, newSpell.g, newSpell.b
                                 end,
@@ -619,6 +663,18 @@ local function GetOptions()
                                     newSpell.r = r
                                     newSpell.g = g
                                     newSpell.b = b
+                                end
+                            },
+                            useDefaultColor = {
+                                type = "toggle",
+                                name = "Use Default Color",
+                                desc = "Use the default proc glow color instead of a custom one.",
+                                order = 2.5,
+                                get = function()
+                                    return newSpell.useDefaultColor
+                                end,
+                                set = function(_, v)
+                                    newSpell.useDefaultColor = v
                                 end
                             },
                             add = {
@@ -639,13 +695,15 @@ local function GetOptions()
                                             r = newSpell.r,
                                             g = newSpell.g,
                                             b = newSpell.b
-                                        }
+                                        },
+                                        useDefaultColor = newSpell.useDefaultColor
                                     }
                                     addon:RebuildTables()
                                     newSpell.spellID = ""
                                     newSpell.r = 0;
                                     newSpell.g = 1;
                                     newSpell.b = 0
+                                    newSpell.useDefaultColor = true
                                     print("|cff00ff00[ProcGlows]|r Spell added: " .. SpellName(id) .. " (" .. id .. ")")
                                 end
                             }
@@ -864,6 +922,9 @@ local function GetOptions()
                                 name = "Glow Color",
                                 order = 3,
                                 hasAlpha = false,
+                                disabled = function()
+                                    return entry.useDefaultColor
+                                end,
                                 get = function()
                                     return entry.color.r, entry.color.g, entry.color.b
                                 end,
@@ -871,6 +932,19 @@ local function GetOptions()
                                     entry.color.r = r
                                     entry.color.g = g
                                     entry.color.b = b
+                                    addon:RebuildTables()
+                                end
+                            },
+                            useDefaultColor = {
+                                type = "toggle",
+                                name = "Use Default Color",
+                                desc = "Use the default proc glow color instead of a custom one.",
+                                order = 3.5,
+                                get = function()
+                                    return entry.useDefaultColor
+                                end,
+                                set = function(_, v)
+                                    entry.useDefaultColor = v
                                     addon:RebuildTables()
                                 end
                             },
@@ -957,6 +1031,9 @@ local function GetOptions()
                     name = "Glow Color",
                     order = 2,
                     hasAlpha = false,
+                    disabled = function()
+                        return entry.useDefaultColor
+                    end,
                     get = function()
                         return entry.color.r, entry.color.g, entry.color.b
                     end,
@@ -964,6 +1041,19 @@ local function GetOptions()
                         entry.color.r = r
                         entry.color.g = g
                         entry.color.b = b
+                        addon:RebuildTables()
+                    end
+                },
+                useDefaultColor = {
+                    type = "toggle",
+                    name = "Use Default Color",
+                    desc = "Use the default proc glow color instead of a custom one.",
+                    order = 2.5,
+                    get = function()
+                        return entry.useDefaultColor
+                    end,
+                    set = function(_, v)
+                        entry.useDefaultColor = v
                         addon:RebuildTables()
                     end
                 },
@@ -1031,6 +1121,9 @@ local function GetOptions()
                                 name = "Glow Color",
                                 order = 2,
                                 hasAlpha = false,
+                                disabled = function()
+                                    return entry.useDefaultColor
+                                end,
                                 get = function()
                                     return entry.color.r, entry.color.g, entry.color.b
                                 end,
@@ -1038,6 +1131,19 @@ local function GetOptions()
                                     entry.color.r = r
                                     entry.color.g = g
                                     entry.color.b = b
+                                    addon:RebuildTables()
+                                end
+                            },
+                            useDefaultColor = {
+                                type = "toggle",
+                                name = "Use Default Color",
+                                desc = "Use the default proc glow color instead of a custom one.",
+                                order = 2.5,
+                                get = function()
+                                    return entry.useDefaultColor
+                                end,
+                                set = function(_, v)
+                                    entry.useDefaultColor = v
                                     addon:RebuildTables()
                                 end
                             },

@@ -1,0 +1,25 @@
+{
+    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+    "diagnostics.disable": [
+        "undefined-field",
+        "duplicate-index",
+        "miss-symbol",
+        "exp-in-action",
+        "miss-exp",
+        "err-assign-as-eq",
+        "unexpect-symbol",
+        "miss-sep-in-table",
+        "redundant-value",
+        "block-after-else",
+        "err-eq-as-assign",
+        "unknown-symbol",
+        "unexpect-efunc-name",
+        "unexpect-dots",
+        "unexpect-string",
+        "miss-esc-x",
+        "miss-method",
+        "miss-name"
+    ],
+    "diagnostics.ignoredFiles": "Disable",
+    "runtime.version": "Lua 5.1"
+}
