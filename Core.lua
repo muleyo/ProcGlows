@@ -273,13 +273,20 @@ function addon:CheckAuras()
                     aura:Hide()
                 end
 
-                -- Glow on the aura icon itself
+                -- Glow on the aura icon itself (delayed by 1 frame to avoid size pop)
                 if auraData.glowIcon then
                     if aura.Cooldown:IsShown() then
-                        if not addon:HasProcGlow(aura) then
-                            addon:ShowProcGlow(aura, auraData.color.r, auraData.color.g, auraData.color.b)
+                        if not addon:HasProcGlow(aura) and not aura._ProcGlowPending then
+                            aura._ProcGlowPending = true
+                            C_Timer.After(0, function()
+                                aura._ProcGlowPending = nil
+                                if aura.Cooldown:IsShown() and not addon:HasProcGlow(aura) then
+                                    addon:ShowProcGlow(aura, auraData.color.r, auraData.color.g, auraData.color.b)
+                                end
+                            end)
                         end
                     else
+                        aura._ProcGlowPending = nil
                         addon:HideProcGlow(aura)
                     end
                 end
