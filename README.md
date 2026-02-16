@@ -12,7 +12,7 @@
 </ul>
 <h2>Slash Commands</h2>
 <ul>
-<li><code>/pg</code> or <code>/procglow</code> &mdash; Open the configuration window</li>
+<li><code>/pg</code> or <code>/procglows</code> &mdash; Open the configuration window</li>
 </ul>
 <p>The settings panel is also available under <strong>Game Menu &rarr; Options &rarr; AddOns &rarr; ProcGlows</strong>.</p>
 <hr>
