@@ -331,7 +331,7 @@ function addon:CheckAuras()
                     if aura.Cooldown:IsShown() and not suppressed then
                         if not addon:HasProcGlow(aura) and not aura._ProcGlowPending then
                             aura._ProcGlowPending = true
-                            C_Timer.After(0, function()
+                            C_Timer.After(0.1, function()
                                 aura._ProcGlowPending = nil
                                 if aura.Cooldown:IsShown() and not addon:HasProcGlow(aura) then
                                     if auraData.useDefaultColor then
