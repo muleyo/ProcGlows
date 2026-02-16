@@ -27,6 +27,54 @@ local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBo
                          "MultiBar8Button"}
 local MAX_ACTION_SLOT = 180
 
+-- ─── Third-party action bar support (Bartender4, Dominos, ElvUI) ─────────────
+
+-- Returns the action slot for both Blizzard (.action) and LAB-based (._state_action) buttons
+local function GetButtonActionSlot(button)
+    return button._state_action or button.action
+end
+
+local thirdPartyButtons = {}
+local thirdPartyDirty = true
+
+local function CollectThirdPartyButtons()
+    wipe(thirdPartyButtons)
+
+    -- Bartender4  (LibActionButton buttons named BT4Button1 … BT4Button120)
+    if _G["Bartender4"] then
+        for i = 1, 120 do
+            local btn = _G["BT4Button" .. i]
+            if btn then
+                thirdPartyButtons[#thirdPartyButtons + 1] = btn
+            end
+        end
+    end
+
+    -- Dominos  (LibActionButton buttons named DominosActionButton1 … DominosActionButton168)
+    if _G["Dominos"] then
+        for i = 1, 168 do
+            local btn = _G["DominosActionButton" .. i]
+            if btn then
+                thirdPartyButtons[#thirdPartyButtons + 1] = btn
+            end
+        end
+    end
+
+    -- ElvUI  (buttons named ElvUI_Bar<1-10>Button<1-12>)
+    if _G["ElvUI"] then
+        for bar = 1, 10 do
+            for slot = 1, 12 do
+                local btn = _G["ElvUI_Bar" .. bar .. "Button" .. slot]
+                if btn then
+                    thirdPartyButtons[#thirdPartyButtons + 1] = btn
+                end
+            end
+        end
+    end
+
+    thirdPartyDirty = false
+end
+
 function addon:ShowProcGlow(button, r, g, b)
     LCG.ProcGlow_Start(button, {
         color = {r, g, b, 1},
@@ -48,7 +96,7 @@ function addon:FindButtonsForSlot(slot)
     local seen = {}
     if ActionBarButtonEventsFrame and ActionBarButtonEventsFrame.frames then
         for _, button in pairs(ActionBarButtonEventsFrame.frames) do
-            if not seen[button] and button.action == slot then
+            if not seen[button] and GetButtonActionSlot(button) == slot then
                 seen[button] = true
                 result[#result + 1] = button
             end
@@ -57,10 +105,20 @@ function addon:FindButtonsForSlot(slot)
     for _, prefix in ipairs(BUTTON_PREFIXES) do
         for i = 1, 12 do
             local button = _G[prefix .. i]
-            if button and not seen[button] and button.action == slot then
+            if button and not seen[button] and GetButtonActionSlot(button) == slot then
                 seen[button] = true
                 result[#result + 1] = button
             end
+        end
+    end
+    -- Third-party action bar addons (Bartender4, Dominos, ElvUI)
+    if thirdPartyDirty then
+        CollectThirdPartyButtons()
+    end
+    for _, button in ipairs(thirdPartyButtons) do
+        if not seen[button] and GetButtonActionSlot(button) == slot then
+            seen[button] = true
+            result[#result + 1] = button
         end
     end
     return result
@@ -117,6 +175,7 @@ end
 function addon:InvalidateAllCaches()
     spellCacheDirty = true
     itemCacheDirty = true
+    thirdPartyDirty = true
     addon:RebuildAuraAnchorCache()
     addon:RebuildSpellButtonCache()
     addon:RebuildItemButtonCache()
