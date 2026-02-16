@@ -6,6 +6,7 @@ addon.events:RegisterEvent("SPELL_UPDATE_USABLE")
 addon.events:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 addon.events:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 addon.events:RegisterEvent("PLAYER_REGEN_ENABLED")
+addon.events:RegisterEvent("PLAYER_REGEN_DISABLED")
 addon.events:RegisterEvent("PLAYER_UNGHOST")
 addon.events:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 addon.events:RegisterEvent("PLAYER_TALENT_UPDATE")
@@ -91,6 +92,18 @@ end
 function addon:HideProcGlow(button)
     LCG.ProcGlow_Stop(button, GLOW_KEY)
     allGlowingButtons[button] = nil
+end
+
+function addon:HideAllGlows()
+    for button in pairs(allGlowingButtons) do
+        LCG.ProcGlow_Stop(button, GLOW_KEY)
+        activeGlows[button] = nil
+    end
+    wipe(allGlowingButtons)
+end
+
+function addon:IsCombatOnly()
+    return self.db and self.db.profile.combatOnly and not UnitAffectingCombat("player")
 end
 
 function addon:CleanupOrphanedGlows()
@@ -297,6 +310,8 @@ function addon:CheckAuras()
         return
     end
 
+    local suppressed = addon:IsCombatOnly()
+
     for aura in BuffIconCooldownViewer.itemFramePool:EnumerateActive() do
         if aura and aura.GetBaseSpellID then
             local spellID = aura:GetBaseSpellID()
@@ -310,7 +325,7 @@ function addon:CheckAuras()
 
                 -- Glow on the aura icon itself (delayed by 1 frame to avoid size pop)
                 if auraData.glowIcon then
-                    if aura.Cooldown:IsShown() then
+                    if aura.Cooldown:IsShown() and not suppressed then
                         if not addon:HasProcGlow(aura) and not aura._ProcGlowPending then
                             aura._ProcGlowPending = true
                             C_Timer.After(0, function()
@@ -328,7 +343,7 @@ function addon:CheckAuras()
 
                 if buttons then
                     for _, button in ipairs(buttons) do
-                        if aura.Cooldown:IsShown() then
+                        if aura.Cooldown:IsShown() and not suppressed then
                             if not addon:HasProcGlow(button) then
                                 addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
                             end
@@ -347,12 +362,14 @@ function addon:CheckItemCooldowns()
         return
     end
 
+    local suppressed = addon:IsCombatOnly()
+
     for _, item in pairs(addon.Items) do
         local buttons = itemAnchorCache[item.itemID]
 
         if buttons then
             for _, button in ipairs(buttons) do
-                if GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and
+                if not suppressed and GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and
                     (not button.cooldown:IsShown()) then
                     if not addon:HasProcGlow(button) then
                         addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
@@ -370,13 +387,15 @@ function addon:CheckSpellCooldowns()
         return
     end
 
+    local suppressed = addon:IsCombatOnly()
+
     for spellID, spellData in pairs(addon.Spells) do
         local buttons = spellAnchorCache[spellID]
         if buttons then
             local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
             for _, button in ipairs(buttons) do
                 local onCooldown = button.cooldown:IsShown() and not cooldownInfo.isOnGCD
-                local shouldGlow = C_Spell.IsSpellUsable(spellID) and not onCooldown
+                local shouldGlow = not suppressed and C_Spell.IsSpellUsable(spellID) and not onCooldown
 
                 if shouldGlow then
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
@@ -400,6 +419,21 @@ addon.events:HookScript("OnEvent", function(self, event, ...)
         event == "PLAYER_ENTERING_WORLD" or event == "UPDATE_OVERRIDE_ACTIONBAR" or event == "UPDATE_BONUS_ACTIONBAR" or
         event == "UPDATE_VEHICLE_ACTIONBAR" then
         addon:InvalidateAllCaches()
+        return
+    end
+    if event == "PLAYER_REGEN_DISABLED" then
+        -- Entering combat: refresh all checks so glows appear immediately
+        addon:CheckAuras()
+        addon:CheckItemCooldowns()
+        addon:CheckSpellCooldowns()
+        return
+    end
+    if event == "PLAYER_REGEN_ENABLED" then
+        -- Leaving combat: if combat-only mode, hide all glows
+        if addon.db and addon.db.profile.combatOnly then
+            addon:HideAllGlows()
+        end
+        addon:CheckItemCooldowns()
         return
     end
     if event == "SPELL_UPDATE_COOLDOWN" then

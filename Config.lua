@@ -22,6 +22,7 @@ local defaults = {
             -- keyed by string spellID
             -- each entry: { color = {r,g,b} }
         },
+        combatOnly = false,
         hideAnimations = {
             castbar = true
         }
@@ -214,6 +215,7 @@ local function ExportProfile()
         auras = addon.db.profile.auras,
         items = addon.db.profile.items,
         spells = addon.db.profile.spells,
+        combatOnly = addon.db.profile.combatOnly,
         hideAnimations = addon.db.profile.hideAnimations
     }
     local serialized = AceSerializer:Serialize(data)
@@ -297,6 +299,9 @@ local function ImportProfile(str)
                 addon.db.profile.spells[k] = v
             end
         end
+    end
+    if data.combatOnly ~= nil then
+        addon.db.profile.combatOnly = data.combatOnly and true or false
     end
     if data.hideAnimations and type(data.hideAnimations) == "table" then
         addon.db.profile.hideAnimations.castbar = data.hideAnimations.castbar and true or false
@@ -749,23 +754,45 @@ local function GetOptions()
                     }
                 }
             },
-            -- ── Animations tab ───────────────────────────────────────────
-            animations = {
+            -- ── Settings tab ─────────────────────────────────────────────
+            settings = {
                 type = "group",
-                name = "Action Bar Animations",
+                name = "Settings",
                 order = 4,
                 args = {
-                    description = {
-                        type = "description",
-                        name = "Toggle Blizzard action-bar overlay animations.\n",
-                        order = 0,
-                        fontSize = "medium"
+                    generalHeader = {
+                        type = "header",
+                        name = "General",
+                        order = 0
+                    },
+                    combatOnly = {
+                        type = "toggle",
+                        name = "Only Show Glows in Combat",
+                        desc = "When enabled, proc glows will only be displayed while you are in combat. All glows are hidden when you leave combat.",
+                        order = 1,
+                        width = "full",
+                        get = function()
+                            return addon.db.profile.combatOnly
+                        end,
+                        set = function(_, v)
+                            addon.db.profile.combatOnly = v
+                            if v and not UnitAffectingCombat("player") then
+                                addon:HideAllGlows()
+                            elseif not v then
+                                addon:InvalidateAllCaches()
+                            end
+                        end
+                    },
+                    animHeader = {
+                        type = "header",
+                        name = "Action Bar Animations",
+                        order = 10
                     },
                     castbar = {
                         type = "toggle",
                         name = "Hide Cast Animations",
                         desc = "Hide the spell-cast / interrupt / reticle animations on action buttons.\n\n|cffff8800Note:|r Enabling/Disabling requires a reload of the UI to take effect.",
-                        order = 1,
+                        order = 11,
                         width = "full",
                         get = function()
                             return addon.db.profile.hideAnimations.castbar
@@ -1067,14 +1094,23 @@ initFrame:SetScript("OnEvent", function(self, event, loadedAddon)
     addon.db.RegisterCallback(addon, "OnProfileChanged", function()
         addon.hideAnimConfig.castbar = addon.db.profile.hideAnimations.castbar
         addon:RebuildTables()
+        if addon.db.profile.combatOnly and not UnitAffectingCombat("player") then
+            addon:HideAllGlows()
+        end
     end)
     addon.db.RegisterCallback(addon, "OnProfileCopied", function()
         addon.hideAnimConfig.castbar = addon.db.profile.hideAnimations.castbar
         addon:RebuildTables()
+        if addon.db.profile.combatOnly and not UnitAffectingCombat("player") then
+            addon:HideAllGlows()
+        end
     end)
     addon.db.RegisterCallback(addon, "OnProfileReset", function()
         addon.hideAnimConfig.castbar = addon.db.profile.hideAnimations.castbar
         addon:RebuildTables()
+        if addon.db.profile.combatOnly and not UnitAffectingCombat("player") then
+            addon:HideAllGlows()
+        end
     end)
 
     -- ── Migrate old flat auras/spells to nested-by-class format ──────────────
