@@ -10,11 +10,15 @@ addon.events:RegisterEvent("PLAYER_UNGHOST")
 addon.events:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 addon.events:RegisterEvent("PLAYER_TALENT_UPDATE")
 addon.events:RegisterEvent("PLAYER_ENTERING_WORLD")
+addon.events:RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR")
+addon.events:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
+addon.events:RegisterEvent("UPDATE_VEHICLE_ACTIONBAR")
 
 local itemSlotCache = {}
 local LCG = addon.LCG
 local activeGlows = {}
 local GLOW_KEY = "ProcGlows"
+local allGlowingButtons = {}
 local spellButtonCache = {}
 local auraAnchorCache = {}
 local itemAnchorCache = {}
@@ -81,10 +85,40 @@ function addon:ShowProcGlow(button, r, g, b)
         startAnim = true,
         key = GLOW_KEY
     })
+    allGlowingButtons[button] = true
 end
 
 function addon:HideProcGlow(button)
     LCG.ProcGlow_Stop(button, GLOW_KEY)
+    allGlowingButtons[button] = nil
+end
+
+function addon:CleanupOrphanedGlows()
+    -- Collect all buttons that are still in a cache
+    local cached = {}
+    for _, buttons in pairs(auraAnchorCache) do
+        for _, button in ipairs(buttons) do
+            cached[button] = true
+        end
+    end
+    for _, buttons in pairs(spellAnchorCache) do
+        for _, button in ipairs(buttons) do
+            cached[button] = true
+        end
+    end
+    for _, buttons in pairs(itemAnchorCache) do
+        for _, button in ipairs(buttons) do
+            cached[button] = true
+        end
+    end
+    -- Remove glows from buttons that are no longer in any cache
+    for button in pairs(allGlowingButtons) do
+        if not cached[button] then
+            LCG.ProcGlow_Stop(button, GLOW_KEY)
+            allGlowingButtons[button] = nil
+            activeGlows[button] = nil
+        end
+    end
 end
 
 function addon:HasProcGlow(button)
@@ -179,6 +213,7 @@ function addon:InvalidateAllCaches()
     addon:RebuildAuraAnchorCache()
     addon:RebuildSpellButtonCache()
     addon:RebuildItemButtonCache()
+    addon:CleanupOrphanedGlows()
 end
 
 function addon:ScanItemButtons()
@@ -362,7 +397,8 @@ end
 -- Hooks
 addon.events:HookScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "ACTIONBAR_SLOT_CHANGED" or
-        event == "PLAYER_ENTERING_WORLD" then
+        event == "PLAYER_ENTERING_WORLD" or event == "UPDATE_OVERRIDE_ACTIONBAR" or event == "UPDATE_BONUS_ACTIONBAR" or
+        event == "UPDATE_VEHICLE_ACTIONBAR" then
         addon:InvalidateAllCaches()
         return
     end
