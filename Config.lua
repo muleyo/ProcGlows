@@ -7,6 +7,23 @@ local AceDB = LibStub("AceDB-3.0")
 local AceDBOptions = LibStub("AceDBOptions-3.0")
 local AceSerializer = LibStub("AceSerializer-3.0")
 local LibDeflate = LibStub("LibDeflate")
+local LSM = LibStub("LibSharedMedia-3.0")
+
+-- ─── Register custom sounds with LibSharedMedia ──────────────────────────────
+local SOUND_PATH = "Interface\\AddOns\\ProcGlows\\Media\\Sounds\\"
+local customSounds = {"AcousticGuitar", "Adds", "AirHorn", "Applause", "BananaPeelSlip", "BatmanPunch", "BikeHorn",
+                      "Blast", "Bleat", "Boss", "BoxingArenaSound", "Brass", "CartoonVoiceBaritone", "CartoonWalking",
+                      "CatMeow2", "ChickenAlarm", "Circle", "CowMooing", "Cross", "Diamond", "DontRelease",
+                      "DoubleWhoosh", "Drums", "Empowered", "ErrorBeep", "Focus", "Glass", "GoatBleating",
+                      "HeartbeatSingle", "Idiot", "KittenMeow", "Left", "Moon", "Next", "OhNo", "Portal", "Protected",
+                      "Release", "Right", "RingingPhone", "RoaringLion", "RobotBlip", "RoosterChickenCalls", "RunAway",
+                      "SharpPunch", "SheepBleat", "Shotgun", "Skull", "Spread", "Square", "SqueakyToyShort",
+                      "SquishFart", "Stack", "Star", "Switch", "SynthChord", "TadaFanfare", "Taunt", "TempleBellHuge",
+                      "Torch", "Triangle", "WarningSiren", "WaterDrop", "Xylophone"}
+for _, name in ipairs(customSounds) do
+    local ext = (name == "Brass" or name == "Glass") and ".mp3" or ".ogg"
+    LSM:Register(LSM.MediaType.SOUND, "PG: " .. name, SOUND_PATH .. name .. ext)
+end
 
 -- ─── Defaults ────────────────────────────────────────────────────────────────
 local defaults = {
@@ -145,7 +162,8 @@ function addon:RebuildTables()
                             },
                             shouldShow = entry.shouldShow,
                             glowIcon = entry.glowIcon,
-                            useDefaultColor = entry.useDefaultColor
+                            useDefaultColor = entry.useDefaultColor,
+                            procSound = entry.procSound
                         }
                     end
                 end
@@ -166,7 +184,8 @@ function addon:RebuildTables()
                         g = entry.color.g,
                         b = entry.color.b
                     },
-                    useDefaultColor = entry.useDefaultColor
+                    useDefaultColor = entry.useDefaultColor,
+                    procSound = entry.procSound
                 }
             end
         end
@@ -186,7 +205,8 @@ function addon:RebuildTables()
                                 g = entry.color.g,
                                 b = entry.color.b
                             },
-                            useDefaultColor = entry.useDefaultColor
+                            useDefaultColor = entry.useDefaultColor,
+                            procSound = entry.procSound
                         }
                     end
                 end
@@ -325,7 +345,8 @@ local newAura = {
     b = 0,
     shouldShow = true,
     glowIcon = false,
-    useDefaultColor = true
+    useDefaultColor = true,
+    procSound = "None"
 }
 
 -- Scan BuffIconCooldownViewer for available buff/proc spell IDs
@@ -354,14 +375,16 @@ local newItem = {
     r = 0.5,
     g = 0.5,
     b = 1,
-    useDefaultColor = true
+    useDefaultColor = true,
+    procSound = "None"
 }
 local newSpell = {
     spellID = "",
     r = 0,
     g = 1,
     b = 0,
-    useDefaultColor = true
+    useDefaultColor = true,
+    procSound = "None"
 }
 
 -- ─── Options table ───────────────────────────────────────────────────────────
@@ -473,6 +496,21 @@ local function GetOptions()
                                     newAura.glowIcon = v
                                 end
                             },
+                            procSound = {
+                                type = "select",
+                                name = "Proc Sound",
+                                desc = "Sound to play when this aura procs. 'None' uses the default from Settings.",
+                                order = 5.5,
+                                width = "double",
+                                dialogControl = "LSM30_Sound",
+                                values = LSM:HashTable(LSM.MediaType.SOUND),
+                                get = function()
+                                    return newAura.procSound
+                                end,
+                                set = function(_, v)
+                                    newAura.procSound = v
+                                end
+                            },
                             add = {
                                 type = "execute",
                                 name = "Add Aura",
@@ -500,7 +538,8 @@ local function GetOptions()
                                         },
                                         shouldShow = newAura.shouldShow,
                                         glowIcon = newAura.glowIcon,
-                                        useDefaultColor = newAura.useDefaultColor
+                                        useDefaultColor = newAura.useDefaultColor,
+                                        procSound = newAura.procSound
                                     }
                                     addon:RebuildTables()
                                     -- reset
@@ -512,6 +551,7 @@ local function GetOptions()
                                     newAura.shouldShow = false
                                     newAura.glowIcon = false
                                     newAura.useDefaultColor = true
+                                    newAura.procSound = "None"
                                     print(
                                         "|cff00ff00[ProcGlows]|r Aura added: " .. SpellName(buffID) .. " (" .. buffID ..
                                             ")")
@@ -583,6 +623,21 @@ local function GetOptions()
                                     newItem.useDefaultColor = v
                                 end
                             },
+                            procSound = {
+                                type = "select",
+                                name = "Proc Sound",
+                                desc = "Sound to play when this item becomes usable. 'None' uses the default from Settings.",
+                                order = 2.7,
+                                width = "double",
+                                dialogControl = "LSM30_Sound",
+                                values = LSM:HashTable(LSM.MediaType.SOUND),
+                                get = function()
+                                    return newItem.procSound
+                                end,
+                                set = function(_, v)
+                                    newItem.procSound = v
+                                end
+                            },
                             add = {
                                 type = "execute",
                                 name = "Add Item",
@@ -601,7 +656,8 @@ local function GetOptions()
                                             g = newItem.g,
                                             b = newItem.b
                                         },
-                                        useDefaultColor = newItem.useDefaultColor
+                                        useDefaultColor = newItem.useDefaultColor,
+                                        procSound = newItem.procSound
                                     }
                                     addon:RebuildTables()
                                     newItem.itemID = ""
@@ -609,6 +665,7 @@ local function GetOptions()
                                     newItem.g = 0.5;
                                     newItem.b = 1
                                     newItem.useDefaultColor = true
+                                    newItem.procSound = "None"
                                     print("|cff00ff00[ProcGlows]|r Item added: " .. ItemName(id) .. " (" .. id .. ")")
                                 end
                             }
@@ -677,6 +734,21 @@ local function GetOptions()
                                     newSpell.useDefaultColor = v
                                 end
                             },
+                            procSound = {
+                                type = "select",
+                                name = "Proc Sound",
+                                desc = "Sound to play when this spell becomes usable. 'None' uses the default from Settings.",
+                                order = 2.7,
+                                width = "double",
+                                dialogControl = "LSM30_Sound",
+                                values = LSM:HashTable(LSM.MediaType.SOUND),
+                                get = function()
+                                    return newSpell.procSound
+                                end,
+                                set = function(_, v)
+                                    newSpell.procSound = v
+                                end
+                            },
                             add = {
                                 type = "execute",
                                 name = "Add Spell",
@@ -696,7 +768,8 @@ local function GetOptions()
                                             g = newSpell.g,
                                             b = newSpell.b
                                         },
-                                        useDefaultColor = newSpell.useDefaultColor
+                                        useDefaultColor = newSpell.useDefaultColor,
+                                        procSound = newSpell.procSound
                                     }
                                     addon:RebuildTables()
                                     newSpell.spellID = ""
@@ -704,6 +777,7 @@ local function GetOptions()
                                     newSpell.g = 1;
                                     newSpell.b = 0
                                     newSpell.useDefaultColor = true
+                                    newSpell.procSound = "None"
                                     print("|cff00ff00[ProcGlows]|r Spell added: " .. SpellName(id) .. " (" .. id .. ")")
                                 end
                             }
@@ -973,6 +1047,22 @@ local function GetOptions()
                                     addon:RebuildTables()
                                 end
                             },
+                            procSound = {
+                                type = "select",
+                                name = "Proc Sound",
+                                desc = "Sound to play when this aura procs. 'None' uses the default from Settings.",
+                                order = 6,
+                                width = "double",
+                                dialogControl = "LSM30_Sound",
+                                values = LSM:HashTable(LSM.MediaType.SOUND),
+                                get = function()
+                                    return entry.procSound or "None"
+                                end,
+                                set = function(_, v)
+                                    entry.procSound = v
+                                    addon:RebuildTables()
+                                end
+                            },
                             spacer = {
                                 type = "description",
                                 name = "",
@@ -1054,6 +1144,22 @@ local function GetOptions()
                     end,
                     set = function(_, v)
                         entry.useDefaultColor = v
+                        addon:RebuildTables()
+                    end
+                },
+                procSound = {
+                    type = "select",
+                    name = "Proc Sound",
+                    desc = "Sound to play when this item becomes usable. 'None' uses the default from Settings.",
+                    order = 3,
+                    width = "double",
+                    dialogControl = "LSM30_Sound",
+                    values = LSM:HashTable(LSM.MediaType.SOUND),
+                    get = function()
+                        return entry.procSound or "None"
+                    end,
+                    set = function(_, v)
+                        entry.procSound = v
                         addon:RebuildTables()
                     end
                 },
@@ -1144,6 +1250,22 @@ local function GetOptions()
                                 end,
                                 set = function(_, v)
                                     entry.useDefaultColor = v
+                                    addon:RebuildTables()
+                                end
+                            },
+                            procSound = {
+                                type = "select",
+                                name = "Proc Sound",
+                                desc = "Sound to play when this spell becomes usable. 'None' uses the default from Settings.",
+                                order = 3,
+                                width = "double",
+                                dialogControl = "LSM30_Sound",
+                                values = LSM:HashTable(LSM.MediaType.SOUND),
+                                get = function()
+                                    return entry.procSound or "None"
+                                end,
+                                set = function(_, v)
+                                    entry.procSound = v
                                     addon:RebuildTables()
                                 end
                             },

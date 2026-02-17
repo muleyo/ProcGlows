@@ -27,6 +27,7 @@ local spellAnchorCache = {}
 local spellCacheDirty = true
 local itemCacheDirty = true
 local wasOnGCD = {}
+local LSM = LibStub("LibSharedMedia-3.0")
 local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
                          "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button",
                          "MultiBar8Button"}
@@ -80,7 +81,7 @@ local function CollectThirdPartyButtons()
     thirdPartyDirty = false
 end
 
-function addon:ShowProcGlow(button, r, g, b)
+function addon:ShowProcGlow(button, r, g, b, soundKey)
     local opts = {
         startAnim = true,
         key = GLOW_KEY
@@ -89,6 +90,15 @@ function addon:ShowProcGlow(button, r, g, b)
         opts.color = {r, g, b, 1}
     end
     LCG.ProcGlow_Start(button, opts)
+    if not allGlowingButtons[button] then
+        -- Play per-entry proc sound
+        if soundKey and soundKey ~= "None" then
+            local soundFile = LSM:Fetch(LSM.MediaType.SOUND, soundKey, true)
+            if soundFile then
+                PlaySoundFile(soundFile, "Master")
+            end
+        end
+    end
     allGlowingButtons[button] = true
 end
 
@@ -335,9 +345,10 @@ function addon:CheckAuras()
                                 aura._ProcGlowPending = nil
                                 if aura.Cooldown:IsShown() and not addon:HasProcGlow(aura) then
                                     if auraData.useDefaultColor then
-                                        addon:ShowProcGlow(aura)
+                                        addon:ShowProcGlow(aura, nil, nil, nil, auraData.procSound)
                                     else
-                                        addon:ShowProcGlow(aura, auraData.color.r, auraData.color.g, auraData.color.b)
+                                        addon:ShowProcGlow(aura, auraData.color.r, auraData.color.g, auraData.color.b,
+                                            auraData.procSound)
                                     end
                                 end
                             end)
@@ -353,9 +364,10 @@ function addon:CheckAuras()
                         if aura.Cooldown:IsShown() and not suppressed then
                             if not addon:HasProcGlow(button) then
                                 if auraData.useDefaultColor then
-                                    addon:ShowProcGlow(button)
+                                    addon:ShowProcGlow(button, nil, nil, nil, auraData.procSound)
                                 else
-                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b)
+                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b,
+                                        auraData.procSound)
                                 end
                             end
                         else
@@ -384,9 +396,9 @@ function addon:CheckItemCooldowns()
                     (not button.cooldown:IsShown()) then
                     if not addon:HasProcGlow(button) then
                         if item.useDefaultColor then
-                            addon:ShowProcGlow(button)
+                            addon:ShowProcGlow(button, nil, nil, nil, item.procSound)
                         else
-                            addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b)
+                            addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b, item.procSound)
                         end
                     end
                 else
@@ -416,9 +428,10 @@ function addon:CheckSpellCooldowns()
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
                         activeGlows[button] = true
                         if spellData.useDefaultColor then
-                            addon:ShowProcGlow(button)
+                            addon:ShowProcGlow(button, nil, nil, nil, spellData.procSound)
                         else
-                            addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b)
+                            addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b,
+                                spellData.procSound)
                         end
                     end
                 else

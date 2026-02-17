@@ -12,6 +12,9 @@
     <Include file="AceConfig-3.0\AceConfig-3.0.xml" />
     <Include file="AceHook-3.0\AceHook-3.0.xml" />
     <Include file="AceSerializer-3.0\AceSerializer-3.0.xml" />
+    <Include file="LibSharedMedia-3.0\lib.xml" />
+    <Include file="AceGUI-3.0-SharedMediaWidgets\widget.xml" />
+    <Include file="AceGUI-3.0_SFX-Widgets\AceGUI-3.0_SFX-Widgets.xml" />
     <Include file="LibDeflate\lib.xml" />
     <Include file="LibCustomGlow-1.0\LibCustomGlow-1.0.xml" />
 </Ui>
