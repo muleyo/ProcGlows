@@ -151,9 +151,13 @@ function addon:RebuildTables()
         for classToken, classAuras in pairs(self.db.profile.auras) do
             if type(classAuras) == "table" then
                 for key, entry in pairs(classAuras) do
-                    local spellID = tonumber(key)
+                    -- Support both old (key=buffID) and new (key=buffID_anchorID) formats
+                    local spellID = entry.buffSpellID or tonumber(key)
                     if spellID and entry.color then
-                        self.Auras[spellID] = {
+                        if not self.Auras[spellID] then
+                            self.Auras[spellID] = {}
+                        end
+                        self.Auras[spellID][#self.Auras[spellID] + 1] = {
                             anchorSpellID = entry.anchorSpellID,
                             color = {
                                 r = entry.color.r,
@@ -163,7 +167,8 @@ function addon:RebuildTables()
                             shouldShow = entry.shouldShow,
                             glowIcon = entry.glowIcon,
                             useDefaultColor = entry.useDefaultColor,
-                            procSound = entry.procSound
+                            procSound = entry.procSound,
+                            glowCooldownManager = entry.glowCooldownManager
                         }
                     end
                 end
@@ -206,7 +211,8 @@ function addon:RebuildTables()
                                 b = entry.color.b
                             },
                             useDefaultColor = entry.useDefaultColor,
-                            procSound = entry.procSound
+                            procSound = entry.procSound,
+                            glowCooldownManager = entry.glowCooldownManager
                         }
                     end
                 end
@@ -346,7 +352,8 @@ local newAura = {
     shouldShow = true,
     glowIcon = false,
     useDefaultColor = true,
-    procSound = "None"
+    procSound = "None",
+    glowCooldownManager = false
 }
 
 -- Scan BuffIconCooldownViewer for available buff/proc spell IDs
@@ -384,7 +391,8 @@ local newSpell = {
     g = 1,
     b = 0,
     useDefaultColor = true,
-    procSound = "None"
+    procSound = "None",
+    glowCooldownManager = false
 }
 
 -- ─── Options table ───────────────────────────────────────────────────────────
@@ -486,7 +494,7 @@ local function GetOptions()
                             },
                             glowIcon = {
                                 type = "toggle",
-                                name = "Glow Aura Icon",
+                                name = "Glow CDM Aura Icon",
                                 desc = "Show a proc glow on the aura icon itself in the CooldownManager.",
                                 order = 5,
                                 get = function()
@@ -511,6 +519,18 @@ local function GetOptions()
                                     newAura.procSound = v
                                 end
                             },
+                            glowCooldownManager = {
+                                type = "toggle",
+                                name = "Glow CDM Spell Icon",
+                                desc = "Also glow the matching spell icon in the CooldownManager when this aura is active.",
+                                order = 5.6,
+                                get = function()
+                                    return newAura.glowCooldownManager
+                                end,
+                                set = function(_, v)
+                                    newAura.glowCooldownManager = v
+                                end
+                            },
                             add = {
                                 type = "execute",
                                 name = "Add Aura",
@@ -527,9 +547,10 @@ local function GetOptions()
                                         print("|cffff0000[ProcGlows]|r Invalid target spell ID.")
                                         return
                                     end
-                                    local key = tostring(buffID)
+                                    local key = tostring(buffID) .. "_" .. tostring(anchorID)
                                     addon.db.profile.auras[addon.Class] = addon.db.profile.auras[addon.Class] or {}
                                     addon.db.profile.auras[addon.Class][key] = {
+                                        buffSpellID = buffID,
                                         anchorSpellID = anchorID,
                                         color = {
                                             r = newAura.r,
@@ -539,7 +560,8 @@ local function GetOptions()
                                         shouldShow = newAura.shouldShow,
                                         glowIcon = newAura.glowIcon,
                                         useDefaultColor = newAura.useDefaultColor,
-                                        procSound = newAura.procSound
+                                        procSound = newAura.procSound,
+                                        glowCooldownManager = newAura.glowCooldownManager
                                     }
                                     addon:RebuildTables()
                                     -- reset
@@ -552,6 +574,7 @@ local function GetOptions()
                                     newAura.glowIcon = false
                                     newAura.useDefaultColor = true
                                     newAura.procSound = "None"
+                                    newAura.glowCooldownManager = false
                                     print(
                                         "|cff00ff00[ProcGlows]|r Aura added: " .. SpellName(buffID) .. " (" .. buffID ..
                                             ")")
@@ -749,6 +772,18 @@ local function GetOptions()
                                     newSpell.procSound = v
                                 end
                             },
+                            glowCooldownManager = {
+                                type = "toggle",
+                                name = "Glow in CooldownManager",
+                                desc = "Also glow the spell icon in the CooldownManager when it is off cooldown and usable.",
+                                order = 2.8,
+                                get = function()
+                                    return newSpell.glowCooldownManager
+                                end,
+                                set = function(_, v)
+                                    newSpell.glowCooldownManager = v
+                                end
+                            },
                             add = {
                                 type = "execute",
                                 name = "Add Spell",
@@ -769,7 +804,8 @@ local function GetOptions()
                                             b = newSpell.b
                                         },
                                         useDefaultColor = newSpell.useDefaultColor,
-                                        procSound = newSpell.procSound
+                                        procSound = newSpell.procSound,
+                                        glowCooldownManager = newSpell.glowCooldownManager
                                     }
                                     addon:RebuildTables()
                                     newSpell.spellID = ""
@@ -778,6 +814,7 @@ local function GetOptions()
                                     newSpell.b = 0
                                     newSpell.useDefaultColor = true
                                     newSpell.procSound = "None"
+                                    newSpell.glowCooldownManager = false
                                     print("|cff00ff00[ProcGlows]|r Spell added: " .. SpellName(id) .. " (" .. id .. ")")
                                 end
                             }
@@ -959,137 +996,165 @@ local function GetOptions()
             if classAuras then
                 local entryOrder = 1
                 for key, entry in pairs(classAuras) do
-                    local buffID = tonumber(key)
-                    local icon = C_Spell.GetSpellTexture(buffID)
-                    local iconStr = icon and ("|T" .. icon .. ":16:16:0:0|t ") or ""
-                    local label = iconStr .. SpellName(buffID) .. " (" .. key .. ")"
+                    local buffID = entry.buffSpellID or tonumber(key)
+                    if buffID then
+                        local icon = C_Spell.GetSpellTexture(buffID)
+                        local iconStr = icon and ("|T" .. icon .. ":16:16:0:0|t ") or ""
+                        local anchorIcon = entry.anchorSpellID and C_Spell.GetSpellTexture(entry.anchorSpellID)
+                        local anchorIconStr = anchorIcon and ("|T" .. anchorIcon .. ":16:16:0:0|t ") or ""
+                        local label = iconStr .. SpellName(buffID) .. " → " .. anchorIconStr ..
+                                          SpellName(entry.anchorSpellID or 0)
 
-                    classGroup.args["aura_" .. key] = {
-                        type = "group",
-                        name = label,
-                        order = entryOrder,
-                        args = {
-                            buffSpellID = {
-                                type = "description",
-                                name = "|cffffffffBuff Spell ID:|r " .. key,
-                                order = 1,
-                                fontSize = "medium"
-                            },
-                            anchorSpellID = {
-                                type = "input",
-                                name = "Target Spell ID",
-                                order = 2,
-                                width = "normal",
-                                get = function()
-                                    return tostring(entry.anchorSpellID or "")
-                                end,
-                                set = function(_, v)
-                                    local id = tonumber(v)
-                                    if id then
-                                        entry.anchorSpellID = id
+                        classGroup.args["aura_" .. key] = {
+                            type = "group",
+                            name = label,
+                            order = entryOrder,
+                            args = {
+                                buffSpellID = {
+                                    type = "description",
+                                    name = "|cffffffffBuff Spell ID:|r " .. tostring(buffID),
+                                    order = 1,
+                                    fontSize = "medium"
+                                },
+                                anchorSpellID = {
+                                    type = "input",
+                                    name = "Target Spell ID",
+                                    order = 2,
+                                    width = "normal",
+                                    get = function()
+                                        return tostring(entry.anchorSpellID or "")
+                                    end,
+                                    set = function(_, v)
+                                        local id = tonumber(v)
+                                        if id then
+                                            entry.anchorSpellID = id
+                                            -- Re-key if using composite key format
+                                            if entry.buffSpellID then
+                                                local newKey = tostring(entry.buffSpellID) .. "_" .. tostring(id)
+                                                if newKey ~= key then
+                                                    classAuras[newKey] = entry
+                                                    classAuras[key] = nil
+                                                end
+                                            end
+                                            addon:RebuildTables()
+                                            local AceConfigReg = LibStub("AceConfigRegistry-3.0")
+                                            AceConfigReg:NotifyChange(addonName)
+                                        end
+                                    end
+                                },
+                                color = {
+                                    type = "color",
+                                    name = "Glow Color",
+                                    order = 3,
+                                    hasAlpha = false,
+                                    disabled = function()
+                                        return entry.useDefaultColor
+                                    end,
+                                    get = function()
+                                        return entry.color.r, entry.color.g, entry.color.b
+                                    end,
+                                    set = function(_, r, g, b)
+                                        entry.color.r = r
+                                        entry.color.g = g
+                                        entry.color.b = b
                                         addon:RebuildTables()
                                     end
-                                end
-                            },
-                            color = {
-                                type = "color",
-                                name = "Glow Color",
-                                order = 3,
-                                hasAlpha = false,
-                                disabled = function()
-                                    return entry.useDefaultColor
-                                end,
-                                get = function()
-                                    return entry.color.r, entry.color.g, entry.color.b
-                                end,
-                                set = function(_, r, g, b)
-                                    entry.color.r = r
-                                    entry.color.g = g
-                                    entry.color.b = b
-                                    addon:RebuildTables()
-                                end
-                            },
-                            useDefaultColor = {
-                                type = "toggle",
-                                name = "Use Default Color",
-                                desc = "Use the default proc glow color instead of a custom one.",
-                                order = 3.5,
-                                get = function()
-                                    return entry.useDefaultColor
-                                end,
-                                set = function(_, v)
-                                    entry.useDefaultColor = v
-                                    addon:RebuildTables()
-                                end
-                            },
-                            shouldShow = {
-                                type = "toggle",
-                                name = "Show Aura Icon in CDM",
-                                order = 4,
-                                get = function()
-                                    return entry.shouldShow
-                                end,
-                                set = function(_, v)
-                                    entry.shouldShow = v
-                                    addon:RebuildTables()
-                                end
-                            },
-                            glowIcon = {
-                                type = "toggle",
-                                name = "Glow Aura Icon",
-                                desc = "Show a proc glow on the aura icon itself in the CooldownManager.",
-                                order = 5,
-                                get = function()
-                                    return entry.glowIcon
-                                end,
-                                set = function(_, v)
-                                    entry.glowIcon = v
-                                    addon:RebuildTables()
-                                end
-                            },
-                            procSound = {
-                                type = "select",
-                                name = "Proc Sound",
-                                desc = "Sound to play when this aura procs. 'None' uses the default from Settings.",
-                                order = 6,
-                                width = "double",
-                                dialogControl = "LSM30_Sound",
-                                values = LSM:HashTable(LSM.MediaType.SOUND),
-                                get = function()
-                                    return entry.procSound or "None"
-                                end,
-                                set = function(_, v)
-                                    entry.procSound = v
-                                    addon:RebuildTables()
-                                end
-                            },
-                            spacer = {
-                                type = "description",
-                                name = "",
-                                order = 9,
-                                width = "full"
-                            },
-                            remove = {
-                                type = "execute",
-                                name = "|cffff4444Remove|r",
-                                order = 10,
-                                width = "normal",
-                                confirm = true,
-                                confirmText = "Remove aura " .. label .. "?",
-                                func = function()
-                                    addon.db.profile.auras[classToken][key] = nil
-                                    if not next(addon.db.profile.auras[classToken]) then
-                                        addon.db.profile.auras[classToken] = nil
+                                },
+                                useDefaultColor = {
+                                    type = "toggle",
+                                    name = "Use Default Color",
+                                    desc = "Use the default proc glow color instead of a custom one.",
+                                    order = 3.5,
+                                    get = function()
+                                        return entry.useDefaultColor
+                                    end,
+                                    set = function(_, v)
+                                        entry.useDefaultColor = v
+                                        addon:RebuildTables()
                                     end
-                                    addon:RebuildTables()
-                                    AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
-                                    AceConfigRegistry:NotifyChange(addonName)
-                                    print("|cffff8800[ProcGlows]|r Aura removed: " .. label)
-                                end
+                                },
+                                shouldShow = {
+                                    type = "toggle",
+                                    name = "Show Aura Icon in CDM",
+                                    order = 4,
+                                    get = function()
+                                        return entry.shouldShow
+                                    end,
+                                    set = function(_, v)
+                                        entry.shouldShow = v
+                                        addon:RebuildTables()
+                                    end
+                                },
+                                glowIcon = {
+                                    type = "toggle",
+                                    name = "Glow CDM Aura Icon",
+                                    desc = "Show a proc glow on the aura icon itself in the CooldownManager.",
+                                    order = 5,
+                                    get = function()
+                                        return entry.glowIcon
+                                    end,
+                                    set = function(_, v)
+                                        entry.glowIcon = v
+                                        addon:RebuildTables()
+                                    end
+                                },
+                                glowCooldownManager = {
+                                    type = "toggle",
+                                    name = "Glow CDM Spell Icon",
+                                    desc = "Also glow the matching spell icon in the CooldownManager when this aura is active.",
+                                    order = 5.5,
+                                    get = function()
+                                        return entry.glowCooldownManager
+                                    end,
+                                    set = function(_, v)
+                                        entry.glowCooldownManager = v
+                                        addon:RebuildTables()
+                                    end
+                                },
+                                procSound = {
+                                    type = "select",
+                                    name = "Proc Sound",
+                                    desc = "Sound to play when this aura procs. 'None' uses the default from Settings.",
+                                    order = 6,
+                                    width = "double",
+                                    dialogControl = "LSM30_Sound",
+                                    values = LSM:HashTable(LSM.MediaType.SOUND),
+                                    get = function()
+                                        return entry.procSound or "None"
+                                    end,
+                                    set = function(_, v)
+                                        entry.procSound = v
+                                        addon:RebuildTables()
+                                    end
+                                },
+                                spacer = {
+                                    type = "description",
+                                    name = "",
+                                    order = 9,
+                                    width = "full"
+                                },
+                                remove = {
+                                    type = "execute",
+                                    name = "|cffff4444Remove|r",
+                                    order = 10,
+                                    width = "normal",
+                                    confirm = true,
+                                    confirmText = "Remove aura " .. label .. "?",
+                                    func = function()
+                                        addon.db.profile.auras[classToken][key] = nil
+                                        if not next(addon.db.profile.auras[classToken]) then
+                                            addon.db.profile.auras[classToken] = nil
+                                        end
+                                        addon:RebuildTables()
+                                        AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
+                                        AceConfigRegistry:NotifyChange(addonName)
+                                        print("|cffff8800[ProcGlows]|r Aura removed: " .. label)
+                                    end
+                                }
                             }
                         }
-                    }
-                    entryOrder = entryOrder + 1
+                        entryOrder = entryOrder + 1
+                    end -- if buffID
                 end
             end
 
@@ -1266,6 +1331,19 @@ local function GetOptions()
                                 end,
                                 set = function(_, v)
                                     entry.procSound = v
+                                    addon:RebuildTables()
+                                end
+                            },
+                            glowCooldownManager = {
+                                type = "toggle",
+                                name = "Glow in CooldownManager",
+                                desc = "Also glow the spell icon in the CooldownManager when it is off cooldown and usable.",
+                                order = 4,
+                                get = function()
+                                    return entry.glowCooldownManager
+                                end,
+                                set = function(_, v)
+                                    entry.glowCooldownManager = v
                                     addon:RebuildTables()
                                 end
                             },
