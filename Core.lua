@@ -27,6 +27,7 @@ local cdmSpellFrameCache = {}
 local spellCacheDirty = true
 local itemCacheDirty = true
 local wasOnGCD = {}
+local stackTexts = {}
 local LSM = LibStub("LibSharedMedia-3.0")
 local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
                          "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button",
@@ -81,6 +82,35 @@ local function CollectThirdPartyButtons()
     thirdPartyDirty = false
 end
 
+-- ─── Stack count overlay ─────────────────────────────────────────────────────
+local STACK_FONT = "Fonts\\FRIZQT__.TTF"
+local STACK_FONT_SIZE = 20
+local STACK_FONT_FLAGS = "OUTLINE"
+
+function addon:ShowStackCount(frame, count)
+    if not count or count < 2 then
+        addon:HideStackCount(frame)
+        return
+    end
+    local text = stackTexts[frame]
+    if not text then
+        text = frame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        text:SetFont(STACK_FONT, STACK_FONT_SIZE, STACK_FONT_FLAGS)
+        text:SetPoint("CENTER", frame, "CENTER", 0, 0)
+        text:SetTextColor(1, 0, 0, 1)
+        stackTexts[frame] = text
+    end
+    text:SetText(count)
+    text:Show()
+end
+
+function addon:HideStackCount(frame)
+    local text = stackTexts[frame]
+    if text then
+        text:Hide()
+    end
+end
+
 function addon:ShowProcGlow(button, r, g, b, soundKey)
     local opts = {
         startAnim = true,
@@ -105,12 +135,14 @@ end
 function addon:HideProcGlow(button)
     LCG.ProcGlow_Stop(button, GLOW_KEY)
     allGlowingButtons[button] = nil
+    addon:HideStackCount(button)
 end
 
 function addon:HideAllGlows()
     for button in pairs(allGlowingButtons) do
         LCG.ProcGlow_Stop(button, GLOW_KEY)
         activeGlows[button] = nil
+        addon:HideStackCount(button)
     end
     wipe(allGlowingButtons)
 end
@@ -359,92 +391,99 @@ function addon:CheckAuras()
     local suppressed = addon:IsCombatOnly()
 
     for aura in BuffIconCooldownViewer.itemFramePool:EnumerateActive() do
-        if aura and aura.GetBaseSpellID then
-            local spellID = aura:GetBaseSpellID()
-            local entries = spellID and addon.Auras[spellID]
-            if entries then
-                -- shouldShow: hide aura if ALL entries say not to show
-                local anyShow = false
-                for _, auraData in ipairs(entries) do
-                    if auraData.shouldShow then
-                        anyShow = true
-                        break
-                    end
+        local spellID = aura:GetBaseSpellID()
+        local entries = spellID and addon.Auras[spellID]
+        if entries then
+            -- shouldShow: hide aura if ALL entries say not to show
+            local anyShow = false
+            for _, auraData in ipairs(entries) do
+                if auraData.shouldShow then
+                    anyShow = true
+                    break
                 end
-                if not anyShow then
-                    aura:Hide()
-                end
+            end
+            if not anyShow then
+                aura:Hide()
+            end
 
-                -- Glow on the aura icon itself: use first entry with glowIcon
-                local iconGlowData = nil
-                for _, auraData in ipairs(entries) do
-                    if auraData.glowIcon then
-                        iconGlowData = auraData
-                        break
-                    end
+            -- Glow on the aura icon itself: use first entry with glowIcon
+            local iconGlowData = nil
+            for _, auraData in ipairs(entries) do
+                if auraData.glowIcon then
+                    iconGlowData = auraData
+                    break
                 end
-                if iconGlowData then
-                    if aura.Cooldown:IsShown() and not suppressed then
-                        if not addon:HasProcGlow(aura) and not aura._ProcGlowPending then
-                            aura._ProcGlowPending = true
-                            C_Timer.After(0.1, function()
-                                aura._ProcGlowPending = nil
-                                if aura.Cooldown:IsShown() and not addon:HasProcGlow(aura) then
-                                    if iconGlowData.useDefaultColor then
-                                        addon:ShowProcGlow(aura, nil, nil, nil, iconGlowData.procSound)
-                                    else
-                                        addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g,
-                                            iconGlowData.color.b, iconGlowData.procSound)
-                                    end
-                                end
-                            end)
-                        end
-                    else
+            end
+            if iconGlowData then
+                if aura.Cooldown:IsShown() and not suppressed then
+                    if not addon:HasProcGlow(aura) and not aura._ProcGlowPending then
+                        aura._ProcGlowPending = true
                         aura._ProcGlowPending = nil
-                        addon:HideProcGlow(aura)
-                    end
-                end
-
-                -- Per-entry: action bar buttons and CDM spell frames
-                for _, auraData in ipairs(entries) do
-                    local buttons = auraData.buttons
-                    if buttons then
-                        for _, button in ipairs(buttons) do
-                            if aura.Cooldown:IsShown() and not suppressed then
-                                if not addon:HasProcGlow(button) then
-                                    if auraData.useDefaultColor then
-                                        addon:ShowProcGlow(button, nil, nil, nil, auraData.procSound)
-                                    else
-                                        addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b,
-                                            auraData.procSound)
-                                    end
-                                end
+                        if aura.Cooldown:IsShown() and not addon:HasProcGlow(aura) then
+                            if iconGlowData.useDefaultColor then
+                                addon:ShowProcGlow(aura, nil, nil, nil, iconGlowData.procSound)
                             else
-                                addon:HideProcGlow(button)
+                                addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g,
+                                    iconGlowData.color.b, iconGlowData.procSound)
                             end
                         end
                     end
+                else
+                    aura._ProcGlowPending = nil
+                    addon:HideProcGlow(aura)
+                end
+            end
 
-                    -- Glow matching spell icon in EssentialCooldownViewer (CooldownManager)
-                    if auraData.glowCooldownManager then
-                        local cdmFrames = cdmSpellFrameCache[auraData.anchorSpellID]
-                        if cdmFrames then
-                            for _, frame in ipairs(cdmFrames) do
-                                if aura.Cooldown:IsShown() and not suppressed then
-                                    if not activeGlows[frame] or not addon:HasProcGlow(frame) then
-                                        activeGlows[frame] = true
-                                        if auraData.useDefaultColor then
-                                            addon:ShowProcGlow(frame, nil, nil, nil, auraData.procSound)
-                                        else
-                                            addon:ShowProcGlow(frame, auraData.color.r, auraData.color.g,
-                                                auraData.color.b, auraData.procSound)
-                                        end
-                                    end
+            -- Fetch stack count once per buff for all entries
+            local stackCount = tonumber(aura.Applications.Applications:GetText())
+
+            -- Per-entry: action bar buttons and CDM spell frames
+            for _, auraData in ipairs(entries) do
+                local buttons = auraData.buttons
+                if buttons then
+                    for _, button in ipairs(buttons) do
+                        if aura.Cooldown:IsShown() and not suppressed then
+                            if not addon:HasProcGlow(button) then
+                                if auraData.useDefaultColor then
+                                    addon:ShowProcGlow(button, nil, nil, nil, auraData.procSound)
                                 else
-                                    if activeGlows[frame] then
-                                        activeGlows[frame] = nil
-                                        addon:HideProcGlow(frame)
+                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b,
+                                        auraData.procSound)
+                                end
+                            end
+                            -- Show stack count on the action button
+                            if auraData.showStacks then
+                                addon:ShowStackCount(button, stackCount)
+                            end
+                        else
+                            addon:HideProcGlow(button)
+                        end
+                    end
+                end
+
+                -- Glow matching spell icon in EssentialCooldownViewer (CooldownManager)
+                if auraData.glowCooldownManager then
+                    local cdmFrames = cdmSpellFrameCache[auraData.anchorSpellID]
+                    if cdmFrames then
+                        for _, frame in ipairs(cdmFrames) do
+                            if aura.Cooldown:IsShown() and not suppressed then
+                                if not activeGlows[frame] or not addon:HasProcGlow(frame) then
+                                    activeGlows[frame] = true
+                                    if auraData.useDefaultColor then
+                                        addon:ShowProcGlow(frame, nil, nil, nil, auraData.procSound)
+                                    else
+                                        addon:ShowProcGlow(frame, auraData.color.r, auraData.color.g, auraData.color.b,
+                                            auraData.procSound)
                                     end
+                                end
+                                -- Show stack count on the CDM spell frame
+                                if auraData.showStacks then
+                                    addon:ShowStackCount(frame, stackCount)
+                                end
+                            else
+                                if activeGlows[frame] then
+                                    activeGlows[frame] = nil
+                                    addon:HideProcGlow(frame)
                                 end
                             end
                         end

@@ -168,7 +168,8 @@ function addon:RebuildTables()
                             glowIcon = entry.glowIcon,
                             useDefaultColor = entry.useDefaultColor,
                             procSound = entry.procSound,
-                            glowCooldownManager = entry.glowCooldownManager
+                            glowCooldownManager = entry.glowCooldownManager,
+                            showStacks = entry.showStacks
                         }
                     end
                 end
@@ -353,7 +354,8 @@ local newAura = {
     glowIcon = false,
     useDefaultColor = true,
     procSound = "None",
-    glowCooldownManager = false
+    glowCooldownManager = false,
+    showStacks = false
 }
 
 -- Scan BuffIconCooldownViewer for available buff/proc spell IDs
@@ -531,6 +533,18 @@ local function GetOptions()
                                     newAura.glowCooldownManager = v
                                 end
                             },
+                            showStacks = {
+                                type = "toggle",
+                                name = "Show Stacks",
+                                desc = "Display the buff stack count on action buttons and CDM spell icons.",
+                                order = 5.7,
+                                get = function()
+                                    return newAura.showStacks
+                                end,
+                                set = function(_, v)
+                                    newAura.showStacks = v
+                                end
+                            },
                             add = {
                                 type = "execute",
                                 name = "Add Aura",
@@ -561,7 +575,8 @@ local function GetOptions()
                                         glowIcon = newAura.glowIcon,
                                         useDefaultColor = newAura.useDefaultColor,
                                         procSound = newAura.procSound,
-                                        glowCooldownManager = newAura.glowCooldownManager
+                                        glowCooldownManager = newAura.glowCooldownManager,
+                                        showStacks = newAura.showStacks
                                     }
                                     addon:RebuildTables()
                                     -- reset
@@ -575,6 +590,7 @@ local function GetOptions()
                                     newAura.useDefaultColor = true
                                     newAura.procSound = "None"
                                     newAura.glowCooldownManager = false
+                                    newAura.showStacks = false
                                     print(
                                         "|cff00ff00[ProcGlows]|r Aura added: " .. SpellName(buffID) .. " (" .. buffID ..
                                             ")")
@@ -1108,6 +1124,19 @@ local function GetOptions()
                                     end,
                                     set = function(_, v)
                                         entry.glowCooldownManager = v
+                                        addon:RebuildTables()
+                                    end
+                                },
+                                showStacks = {
+                                    type = "toggle",
+                                    name = "Show Stacks",
+                                    desc = "Display the buff stack count on action buttons and CDM spell icons.",
+                                    order = 5.6,
+                                    get = function()
+                                        return entry.showStacks
+                                    end,
+                                    set = function(_, v)
+                                        entry.showStacks = v
                                         addon:RebuildTables()
                                     end
                                 },
