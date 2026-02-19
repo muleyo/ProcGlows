@@ -11,15 +11,13 @@ local LSM = LibStub("LibSharedMedia-3.0")
 
 -- ─── Register custom sounds with LibSharedMedia ──────────────────────────────
 local SOUND_PATH = "Interface\\AddOns\\ProcGlows\\Media\\Sounds\\"
-local customSounds = {"AcousticGuitar", "Adds", "AirHorn", "Applause", "BananaPeelSlip", "BatmanPunch", "BikeHorn",
-                      "Blast", "Bleat", "Boss", "BoxingArenaSound", "Brass", "CartoonVoiceBaritone", "CartoonWalking",
-                      "CatMeow2", "ChickenAlarm", "Circle", "CowMooing", "Cross", "Diamond", "DontRelease",
-                      "DoubleWhoosh", "Drums", "Empowered", "ErrorBeep", "Focus", "Glass", "GoatBleating",
-                      "HeartbeatSingle", "Idiot", "KittenMeow", "Left", "Moon", "Next", "OhNo", "Portal", "Protected",
-                      "Release", "Right", "RingingPhone", "RoaringLion", "RobotBlip", "RoosterChickenCalls", "RunAway",
-                      "SharpPunch", "SheepBleat", "Shotgun", "Skull", "Spread", "Square", "SqueakyToyShort",
-                      "SquishFart", "Stack", "Star", "Switch", "SynthChord", "TadaFanfare", "Taunt", "TempleBellHuge",
-                      "Torch", "Triangle", "WarningSiren", "WaterDrop", "Xylophone"}
+local customSounds = {"AcousticGuitar", "Adds", "AirHorn", "Applause", "BananaPeelSlip", "BatmanPunch", "BikeHorn", "Blast", "Bleat", "Boss",
+                      "BoxingArenaSound", "Brass", "CartoonVoiceBaritone", "CartoonWalking", "CatMeow2", "ChickenAlarm", "Circle", "CowMooing",
+                      "Cross", "Diamond", "DontRelease", "DoubleWhoosh", "Drums", "Empowered", "ErrorBeep", "Focus", "Glass", "GoatBleating",
+                      "HeartbeatSingle", "Idiot", "KittenMeow", "Left", "Moon", "Next", "OhNo", "Portal", "Protected", "Release", "Right",
+                      "RingingPhone", "RoaringLion", "RobotBlip", "RoosterChickenCalls", "RunAway", "SharpPunch", "SheepBleat", "Shotgun", "Skull",
+                      "Spread", "Square", "SqueakyToyShort", "SquishFart", "Stack", "Star", "Switch", "SynthChord", "TadaFanfare", "Taunt",
+                      "TempleBellHuge", "Torch", "Triangle", "WarningSiren", "WaterDrop", "Xylophone"}
 for _, name in ipairs(customSounds) do
     local ext = (name == "Brass" or name == "Glass") and ".mp3" or ".ogg"
     LSM:Register(LSM.MediaType.SOUND, "PG: " .. name, SOUND_PATH .. name .. ext)
@@ -591,9 +589,7 @@ local function GetOptions()
                                     newAura.procSound = "None"
                                     newAura.glowCooldownManager = false
                                     newAura.showStacks = false
-                                    print(
-                                        "|cff00ff00[ProcGlows]|r Aura added: " .. SpellName(buffID) .. " (" .. buffID ..
-                                            ")")
+                                    print("|cff00ff00[ProcGlows]|r Aura added: " .. SpellName(buffID) .. " (" .. buffID .. ")")
                                 end
                             }
                         }
@@ -790,7 +786,7 @@ local function GetOptions()
                             },
                             glowCooldownManager = {
                                 type = "toggle",
-                                name = "Glow in CooldownManager",
+                                name = "Glow CDM Spell Icon",
                                 desc = "Also glow the spell icon in the CooldownManager when it is off cooldown and usable.",
                                 order = 2.8,
                                 get = function()
@@ -862,9 +858,8 @@ local function GetOptions()
                             AceConfigReg:NotifyChange(addonName)
                             -- Scroll the export editbox back to the top after the UI rebuilds
                             C_Timer.After(0, function()
-                                local openDialog =
-                                    AceConfigDialog.OpenFrames[addonName] or AceConfigDialog.BlizOptions and
-                                        AceConfigDialog.BlizOptions[addonName]
+                                local openDialog = AceConfigDialog.OpenFrames[addonName] or AceConfigDialog.BlizOptions and
+                                                       AceConfigDialog.BlizOptions[addonName]
                                 if openDialog then
                                     local status = openDialog:GetUserData("status") or openDialog.status
                                     -- Walk child widgets to find the export MultiLineEditBox
@@ -1018,8 +1013,7 @@ local function GetOptions()
                         local iconStr = icon and ("|T" .. icon .. ":16:16:0:0|t ") or ""
                         local anchorIcon = entry.anchorSpellID and C_Spell.GetSpellTexture(entry.anchorSpellID)
                         local anchorIconStr = anchorIcon and ("|T" .. anchorIcon .. ":16:16:0:0|t ") or ""
-                        local label = iconStr .. SpellName(buffID) .. " → " .. anchorIconStr ..
-                                          SpellName(entry.anchorSpellID or 0)
+                        local label = iconStr .. SpellName(buffID) .. " → " .. anchorIconStr .. SpellName(entry.anchorSpellID or 0)
 
                         classGroup.args["aura_" .. key] = {
                             type = "group",
@@ -1365,7 +1359,7 @@ local function GetOptions()
                             },
                             glowCooldownManager = {
                                 type = "toggle",
-                                name = "Glow in CooldownManager",
+                                name = "Glow CDM Spell Icon",
                                 desc = "Also glow the spell icon in the CooldownManager when it is off cooldown and usable.",
                                 order = 4,
                                 get = function()
