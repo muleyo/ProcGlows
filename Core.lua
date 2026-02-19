@@ -626,4 +626,4 @@ addon.events:HookScript("OnEvent", function(self, event, ...)
     addon:CheckItemCooldowns()
 end)
 
-BuffIconCooldownViewer:HookScript("OnUpdate", addon.CheckAuras)
+BuffIconCooldownViewer:HookScript("OnEvent", addon.CheckAuras)
