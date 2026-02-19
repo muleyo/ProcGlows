@@ -26,7 +26,6 @@ local spellAnchorCache = {}
 local cdmSpellFrameCache = {}
 local spellCacheDirty = true
 local itemCacheDirty = true
-local wasOnGCD = {}
 local stackTexts = {}
 local LSM = LibStub("LibSharedMedia-3.0")
 local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
@@ -178,6 +177,17 @@ function addon:CleanupOrphanedGlows()
     for _, frames in pairs(cdmSpellFrameCache) do
         for _, frame in ipairs(frames) do
             cached[frame] = true
+        end
+    end
+    -- Include BuffIconCooldownViewer aura frames that may have icon glows
+    if BuffIconCooldownViewer and BuffIconCooldownViewer.itemFramePool then
+        for aura in BuffIconCooldownViewer.itemFramePool:EnumerateActive() do
+            if aura and aura.GetBaseSpellID then
+                local spellID = aura:GetBaseSpellID()
+                if spellID and addon.Auras and addon.Auras[spellID] then
+                    cached[aura] = true
+                end
+            end
         end
     end
     -- Remove glows from buttons that are no longer in any cache
@@ -416,21 +426,20 @@ function addon:CheckAuras()
             end
             if iconGlowData then
                 if aura.Cooldown:IsShown() and not suppressed then
-                    if not addon:HasProcGlow(aura) and not aura._ProcGlowPending then
-                        aura._ProcGlowPending = true
-                        aura._ProcGlowPending = nil
-                        if aura.Cooldown:IsShown() and not addon:HasProcGlow(aura) then
-                            if iconGlowData.useDefaultColor then
-                                addon:ShowProcGlow(aura, nil, nil, nil, iconGlowData.procSound)
-                            else
-                                addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g,
-                                    iconGlowData.color.b, iconGlowData.procSound)
-                            end
+                    if not activeGlows[aura] or not addon:HasProcGlow(aura) then
+                        activeGlows[aura] = true
+                        if iconGlowData.useDefaultColor then
+                            addon:ShowProcGlow(aura, nil, nil, nil, iconGlowData.procSound)
+                        else
+                            addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g, iconGlowData.color.b,
+                                iconGlowData.procSound)
                         end
                     end
                 else
-                    aura._ProcGlowPending = nil
-                    addon:HideProcGlow(aura)
+                    if activeGlows[aura] then
+                        activeGlows[aura] = nil
+                        addon:HideProcGlow(aura)
+                    end
                 end
             end
 
