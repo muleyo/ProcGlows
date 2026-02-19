@@ -28,9 +28,8 @@ local spellCacheDirty = true
 local itemCacheDirty = true
 local stackTexts = {}
 local LSM = LibStub("LibSharedMedia-3.0")
-local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
-                         "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button",
-                         "MultiBar8Button"}
+local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton",
+                         "MultiBar5Button", "MultiBar6Button", "MultiBar7Button", "MultiBar8Button"}
 local MAX_ACTION_SLOT = 180
 
 -- ─── Third-party action bar support (Bartender4, Dominos, ElvUI) ─────────────
@@ -87,7 +86,7 @@ local STACK_FONT_SIZE = 20
 local STACK_FONT_FLAGS = "OUTLINE"
 
 function addon:ShowStackCount(frame, count)
-    if not count or count < 2 then
+    if not count then
         addon:HideStackCount(frame)
         return
     end
@@ -119,6 +118,13 @@ function addon:ShowProcGlow(button, r, g, b, soundKey)
         opts.color = {r, g, b, 1}
     end
     LCG.ProcGlow_Start(button, opts)
+    -- After the initial start animation fires, disable it so that parent
+    -- hide/show cycles (e.g. BuffIconCooldownViewer recycling frames on
+    -- target switch) resume the loop instead of replaying the intro.
+    local glowFrame = button["_ProcGlow" .. GLOW_KEY]
+    if glowFrame then
+        glowFrame.startAnim = false
+    end
     if not allGlowingButtons[button] then
         -- Play per-entry proc sound
         if soundKey and soundKey ~= "None" then
@@ -431,8 +437,7 @@ function addon:CheckAuras()
                         if iconGlowData.useDefaultColor then
                             addon:ShowProcGlow(aura, nil, nil, nil, iconGlowData.procSound)
                         else
-                            addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g, iconGlowData.color.b,
-                                iconGlowData.procSound)
+                            addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g, iconGlowData.color.b, iconGlowData.procSound)
                         end
                     end
                 else
@@ -444,7 +449,7 @@ function addon:CheckAuras()
             end
 
             -- Fetch stack count once per buff for all entries
-            local stackCount = tonumber(aura.Applications.Applications:GetText())
+            local stackCount = aura.Applications.Applications:GetText()
 
             -- Per-entry: action bar buttons and CDM spell frames
             for _, auraData in ipairs(entries) do
@@ -456,8 +461,7 @@ function addon:CheckAuras()
                                 if auraData.useDefaultColor then
                                     addon:ShowProcGlow(button, nil, nil, nil, auraData.procSound)
                                 else
-                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b,
-                                        auraData.procSound)
+                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b, auraData.procSound)
                                 end
                             end
                             -- Show stack count on the action button
@@ -475,14 +479,13 @@ function addon:CheckAuras()
                     local cdmFrames = cdmSpellFrameCache[auraData.anchorSpellID]
                     if cdmFrames then
                         for _, frame in ipairs(cdmFrames) do
-                            if aura.Cooldown:IsShown() and not suppressed then
+                            if aura.Cooldown:IsShown() and not suppressed and C_Spell.IsSpellUsable(auraData.anchorSpellID) then
                                 if not activeGlows[frame] or not addon:HasProcGlow(frame) then
                                     activeGlows[frame] = true
                                     if auraData.useDefaultColor then
                                         addon:ShowProcGlow(frame, nil, nil, nil, auraData.procSound)
                                     else
-                                        addon:ShowProcGlow(frame, auraData.color.r, auraData.color.g, auraData.color.b,
-                                            auraData.procSound)
+                                        addon:ShowProcGlow(frame, auraData.color.r, auraData.color.g, auraData.color.b, auraData.procSound)
                                     end
                                 end
                                 -- Show stack count on the CDM spell frame
@@ -515,8 +518,7 @@ function addon:CheckItemCooldowns()
 
         if buttons then
             for _, button in ipairs(buttons) do
-                if not suppressed and GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and
-                    (not button.cooldown:IsShown()) then
+                if not suppressed and C_Item.GetItemCount(item.itemID) > 0 and C_Item.IsUsableItem(item.itemID) and (not button.cooldown:IsShown()) then
                     if not addon:HasProcGlow(button) then
                         if item.useDefaultColor then
                             addon:ShowProcGlow(button, nil, nil, nil, item.procSound)
@@ -539,13 +541,16 @@ function addon:CheckSpellCooldowns()
 
     local suppressed = addon:IsCombatOnly()
 
+    local onCooldown
+    local shouldGlow
+
     for spellID, spellData in pairs(addon.Spells) do
         local buttons = spellAnchorCache[spellID]
         if buttons then
-            local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
+            local cdInfo = C_Spell.GetSpellCooldown(spellID)
             for _, button in ipairs(buttons) do
-                local onCooldown = button.cooldown:IsShown() and not cooldownInfo.isOnGCD
-                local shouldGlow = not suppressed and C_Spell.IsSpellUsable(spellID) and not onCooldown
+                onCooldown = button.cooldown:IsShown() and not cdInfo.isOnGCD
+                shouldGlow = not suppressed and C_Spell.IsSpellUsable(spellID) and not onCooldown
 
                 if shouldGlow then
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
@@ -553,8 +558,7 @@ function addon:CheckSpellCooldowns()
                         if spellData.useDefaultColor then
                             addon:ShowProcGlow(button, nil, nil, nil, spellData.procSound)
                         else
-                            addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b,
-                                spellData.procSound)
+                            addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b, spellData.procSound)
                         end
                     end
                 else
@@ -572,21 +576,14 @@ function addon:CheckSpellCooldowns()
         if spellData.glowCooldownManager then
             local cdmFrames = cdmSpellFrameCache[spellID]
             if cdmFrames then
-                local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
                 for _, frame in ipairs(cdmFrames) do
-                    local onCooldown =
-                        frame.Cooldown and frame.Cooldown:IsShown() and frame.cooldownChargesCount < 1 and
-                            not cooldownInfo.isOnGCD
-                    local shouldGlow = not suppressed and C_Spell.IsSpellUsable(spellID) and not onCooldown
-
                     if shouldGlow then
                         if not activeGlows[frame] or not addon:HasProcGlow(frame) then
                             activeGlows[frame] = true
                             if spellData.useDefaultColor then
                                 addon:ShowProcGlow(frame, nil, nil, nil, spellData.procSound)
                             else
-                                addon:ShowProcGlow(frame, spellData.color.r, spellData.color.g, spellData.color.b,
-                                    spellData.procSound)
+                                addon:ShowProcGlow(frame, spellData.color.r, spellData.color.g, spellData.color.b, spellData.procSound)
                             end
                         end
                     else
@@ -603,9 +600,8 @@ end
 
 -- Hooks
 addon.events:HookScript("OnEvent", function(self, event, ...)
-    if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "ACTIONBAR_SLOT_CHANGED" or
-        event == "PLAYER_ENTERING_WORLD" or event == "UPDATE_OVERRIDE_ACTIONBAR" or event == "UPDATE_BONUS_ACTIONBAR" or
-        event == "UPDATE_VEHICLE_ACTIONBAR" then
+    if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "ACTIONBAR_SLOT_CHANGED" or event ==
+        "PLAYER_ENTERING_WORLD" or event == "UPDATE_OVERRIDE_ACTIONBAR" or event == "UPDATE_BONUS_ACTIONBAR" or event == "UPDATE_VEHICLE_ACTIONBAR" then
         addon:InvalidateAllCaches()
         return
     end
@@ -621,7 +617,6 @@ addon.events:HookScript("OnEvent", function(self, event, ...)
         if addon.db and addon.db.profile.combatOnly then
             addon:HideAllGlows()
         end
-        addon:CheckItemCooldowns()
         return
     end
     if event == "SPELL_UPDATE_COOLDOWN" then
