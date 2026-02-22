@@ -17,6 +17,7 @@ addon.events:RegisterEvent("UPDATE_VEHICLE_ACTIONBAR")
 
 local itemSlotCache = {}
 local LCG = addon.LCG
+local lcgWarnedOnce = false
 local activeGlows = {}
 local GLOW_KEY = "ProcGlows"
 local allGlowingButtons = {}
@@ -110,6 +111,15 @@ function addon:HideStackCount(frame)
 end
 
 function addon:ShowProcGlow(button, r, g, b, soundKey)
+    if not LCG.ProcGlow_Start then
+        if not lcgWarnedOnce then
+            lcgWarnedOnce = true
+            print("|cffff4444ProcGlows:|r LibCustomGlow did not fully initialize (ProcGlow_Start is missing). " ..
+                      "This is likely caused by a conflicting addon or a WoW build incompatibility with " ..
+                      "the embedded LibCustomGlow-1.0 (version " .. (LCG.minor or "?") .. "). " .. "Glows will not display until this is resolved.")
+        end
+        return
+    end
     local opts = {
         startAnim = true,
         key = GLOW_KEY
@@ -138,14 +148,18 @@ function addon:ShowProcGlow(button, r, g, b, soundKey)
 end
 
 function addon:HideProcGlow(button)
-    LCG.ProcGlow_Stop(button, GLOW_KEY)
+    if LCG.ProcGlow_Stop then
+        LCG.ProcGlow_Stop(button, GLOW_KEY)
+    end
     allGlowingButtons[button] = nil
     addon:HideStackCount(button)
 end
 
 function addon:HideAllGlows()
     for button in pairs(allGlowingButtons) do
-        LCG.ProcGlow_Stop(button, GLOW_KEY)
+        if LCG.ProcGlow_Stop then
+            LCG.ProcGlow_Stop(button, GLOW_KEY)
+        end
         activeGlows[button] = nil
         addon:HideStackCount(button)
     end
@@ -199,7 +213,9 @@ function addon:CleanupOrphanedGlows()
     -- Remove glows from buttons that are no longer in any cache
     for button in pairs(allGlowingButtons) do
         if not cached[button] then
-            LCG.ProcGlow_Stop(button, GLOW_KEY)
+            if LCG.ProcGlow_Stop then
+                LCG.ProcGlow_Stop(button, GLOW_KEY)
+            end
             allGlowingButtons[button] = nil
             activeGlows[button] = nil
         end
