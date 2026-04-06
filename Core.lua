@@ -642,10 +642,8 @@ function addon:CheckSpellCooldowns()
                 end
             end
         end
-    end
 
     -- Glow spell icons in EssentialCooldownViewer (CooldownManager)
-    for spellID, spellData in pairs(addon.Spells) do
         if spellData.glowCooldownManager then
             local cdmFrames = cdmSpellFrameCache[spellID]
             if cdmFrames then
