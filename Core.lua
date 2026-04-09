@@ -622,12 +622,15 @@ function addon:CheckSpellCooldowns()
     local shouldGlow
 
     for spellID, spellData in pairs(addon.Spells) do
+        local cdInfo = C_Spell.GetSpellCooldown(spellID)
+        local isUsable = not suppressed and C_Spell.IsSpellUsable(spellID)
+
+        -- Action bar buttons
         local buttons = spellAnchorCache[spellID]
         if buttons then
-            local cdInfo = C_Spell.GetSpellCooldown(spellID)
             for _, button in ipairs(buttons) do
                 onCooldown = button.cooldown:IsShown() and not cdInfo.isOnGCD
-                shouldGlow = not suppressed and C_Spell.IsSpellUsable(spellID) and not onCooldown
+                shouldGlow = isUsable and not onCooldown
 
                 if shouldGlow then
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
@@ -647,10 +650,8 @@ function addon:CheckSpellCooldowns()
                 end
             end
         end
-    end
 
-    -- Glow spell icons in EssentialCooldownViewer (CooldownManager)
-    for spellID, spellData in pairs(addon.Spells) do
+        -- Glow spell icons in EssentialCooldownViewer (CooldownManager)
         if spellData.glowCooldownManager then
             local cdmFrames = cdmSpellFrameCache[spellID]
             if cdmFrames then
