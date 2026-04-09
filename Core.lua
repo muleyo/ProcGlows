@@ -29,6 +29,7 @@ local actionSlotSnapshot = {}
 local spellCacheDirty = true
 local itemCacheDirty = true
 local stackTexts = {}
+local recentSounds = {}
 local LSM = LibStub("LibSharedMedia-3.0")
 local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton",
                          "MultiBar5Button", "MultiBar6Button", "MultiBar7Button", "MultiBar8Button"}
@@ -179,11 +180,15 @@ function addon:ShowProcGlow(button, r, g, b, soundKey, entryGlowType)
     end
 
     if not allGlowingButtons[button] then
-        -- Play per-entry proc sound
-        if soundKey and soundKey ~= "None" then
+        -- Play per-entry proc sound (once per sound key per frame)
+        if soundKey and soundKey ~= "None" and not recentSounds[soundKey] then
             local soundFile = LSM:Fetch(LSM.MediaType.SOUND, soundKey, true)
             if soundFile then
                 PlaySoundFile(soundFile, "Master")
+                recentSounds[soundKey] = true
+                C_Timer.After(0, function()
+                    recentSounds[soundKey] = nil
+                end)
             end
         end
     end
@@ -617,12 +622,15 @@ function addon:CheckSpellCooldowns()
     local shouldGlow
 
     for spellID, spellData in pairs(addon.Spells) do
+        local cdInfo = C_Spell.GetSpellCooldown(spellID)
+        local isUsable = not suppressed and C_Spell.IsSpellUsable(spellID)
+
+        -- Action bar buttons
         local buttons = spellAnchorCache[spellID]
         if buttons then
-            local cdInfo = C_Spell.GetSpellCooldown(spellID)
             for _, button in ipairs(buttons) do
                 onCooldown = button.cooldown:IsShown() and not cdInfo.isOnGCD
-                shouldGlow = not suppressed and C_Spell.IsSpellUsable(spellID) and not onCooldown
+                shouldGlow = isUsable and not onCooldown
 
                 if shouldGlow then
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
@@ -642,10 +650,8 @@ function addon:CheckSpellCooldowns()
                 end
             end
         end
-    end
 
-    -- Glow spell icons in EssentialCooldownViewer (CooldownManager)
-    for spellID, spellData in pairs(addon.Spells) do
+        -- Glow spell icons in EssentialCooldownViewer (CooldownManager)
         if spellData.glowCooldownManager then
             local cdmFrames = cdmSpellFrameCache[spellID]
             if cdmFrames then
