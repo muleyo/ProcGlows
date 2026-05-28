@@ -31,6 +31,7 @@ local actionSlotSnapshot = {}
 local spellCacheDirty = true
 local itemCacheDirty = true
 local stackTexts = {}
+local recentSounds = {}
 local LSM = LibStub("LibSharedMedia-3.0")
 local CUSTOM_BORDER_ATLAS = "UI-HUD-RotationHelper-ProcAltGlow"
 local CUSTOM_BORDER_TEXCOORD = {0.9052734375, 0.953125, 0.10888671875, 0.1328125}
@@ -213,11 +214,15 @@ function addon:ShowProcGlow(button, r, g, b, soundKey, entryGlowType)
     end
 
     if not allGlowingButtons[button] then
-        -- Play per-entry proc sound
-        if soundKey and soundKey ~= "None" then
+        -- Play per-entry proc sound (once per sound key per frame)
+        if soundKey and soundKey ~= "None" and not recentSounds[soundKey] then
             local soundFile = LSM:Fetch(LSM.MediaType.SOUND, soundKey, true)
             if soundFile then
                 PlaySoundFile(soundFile, "Master")
+                recentSounds[soundKey] = true
+                C_Timer.After(0, function()
+                    recentSounds[soundKey] = nil
+                end)
             end
         end
     end
