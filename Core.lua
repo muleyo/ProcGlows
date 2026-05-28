@@ -14,6 +14,8 @@ addon.events:RegisterEvent("PLAYER_ENTERING_WORLD")
 addon.events:RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR")
 addon.events:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
 addon.events:RegisterEvent("UPDATE_VEHICLE_ACTIONBAR")
+addon.events:RegisterEvent("BAG_UPDATE_COOLDOWN")
+addon.events:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
 
 local itemSlotCache = {}
 local LCG = addon.LCG
@@ -30,6 +32,36 @@ local spellCacheDirty = true
 local itemCacheDirty = true
 local stackTexts = {}
 local LSM = LibStub("LibSharedMedia-3.0")
+local CUSTOM_BORDER_ATLAS = "UI-HUD-RotationHelper-ProcAltGlow"
+local CUSTOM_BORDER_TEXCOORD = {0.9052734375, 0.953125, 0.10888671875, 0.1328125}
+
+local function CustomBorderGlow_Start(button, color)
+    local tex = button._CustomBorderGlow
+    if not tex then
+        tex = button:CreateTexture(nil, "OVERLAY", nil, 7)
+        local info = C_Texture.GetAtlasInfo(CUSTOM_BORDER_ATLAS)
+        if info then
+            tex:SetTexture(info.file or info.filename)
+            tex:SetTexCoord(unpack(CUSTOM_BORDER_TEXCOORD))
+        end
+        tex:SetPoint("TOPLEFT", button, "TOPLEFT", -2.5, 2.5)
+        tex:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 1.5, -1.5)
+        tex:SetBlendMode("ADD")
+        button._CustomBorderGlow = tex
+    end
+    if color then
+        tex:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+    else
+        tex:SetVertexColor(1, 1, 1, 1)
+    end
+    tex:Show()
+end
+
+local function CustomBorderGlow_Stop(button)
+    if button._CustomBorderGlow then
+        button._CustomBorderGlow:Hide()
+    end
+end
 local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton",
                          "MultiBar5Button", "MultiBar6Button", "MultiBar7Button", "MultiBar8Button"}
 local MAX_ACTION_SLOT = 180
@@ -176,6 +208,8 @@ function addon:ShowProcGlow(button, r, g, b, soundKey, entryGlowType)
         if LCG.ButtonGlow_Start then
             LCG.ButtonGlow_Start(button, color)
         end
+    elseif glowType == "Glow Texture" then
+        CustomBorderGlow_Start(button, color)
     end
 
     if not allGlowingButtons[button] then
@@ -203,6 +237,7 @@ local function StopAllGlowTypes(button)
     if LCG.ButtonGlow_Stop then
         LCG.ButtonGlow_Stop(button)
     end
+    CustomBorderGlow_Stop(button)
 end
 
 function addon:HideProcGlow(button)
@@ -275,8 +310,25 @@ function addon:CleanupOrphanedGlows()
 end
 
 function addon:HasProcGlow(button)
-    return button["_ProcGlow" .. GLOW_KEY] ~= nil or button["_PixelGlow" .. GLOW_KEY] ~= nil or button["_AutoCastGlow" .. GLOW_KEY] ~= nil or
-               button._ButtonGlow ~= nil
+    local pg = button["_ProcGlow" .. GLOW_KEY]
+    if pg and pg:IsShown() then
+        return true
+    end
+    local px = button["_PixelGlow" .. GLOW_KEY]
+    if px and px:IsShown() then
+        return true
+    end
+    local ac = button["_AutoCastGlow" .. GLOW_KEY]
+    if ac and ac:IsShown() then
+        return true
+    end
+    if button._ButtonGlow and button._ButtonGlow:IsShown() then
+        return true
+    end
+    if button._CustomBorderGlow and button._CustomBorderGlow:IsShown() then
+        return true
+    end
+    return false
 end
 
 function addon:FindButtonsForSlot(slot)
@@ -613,17 +665,16 @@ function addon:CheckSpellCooldowns()
 
     local suppressed = addon:IsCombatOnly()
 
-    local onCooldown
-    local shouldGlow
-
     for spellID, spellData in pairs(addon.Spells) do
+        local cdInfo = C_Spell.GetSpellCooldown(spellID)
+        local isOnGCD = cdInfo and cdInfo.isOnGCD
+        local isUsable = C_Spell.IsSpellUsable(spellID)
+
         local buttons = spellAnchorCache[spellID]
         if buttons then
-            local cdInfo = C_Spell.GetSpellCooldown(spellID)
             for _, button in ipairs(buttons) do
-                onCooldown = button.cooldown:IsShown() and not cdInfo.isOnGCD
-                shouldGlow = not suppressed and C_Spell.IsSpellUsable(spellID) and not onCooldown
-
+                local onCooldown = button.cooldown:IsShown() and not isOnGCD
+                local shouldGlow = not suppressed and isUsable and not onCooldown
                 if shouldGlow then
                     if not activeGlows[button] or not addon:HasProcGlow(button) then
                         activeGlows[button] = true
@@ -642,14 +693,15 @@ function addon:CheckSpellCooldowns()
                 end
             end
         end
-    end
 
-    -- Glow spell icons in EssentialCooldownViewer (CooldownManager)
-    for spellID, spellData in pairs(addon.Spells) do
+        -- Glow spell icons in EssentialCooldownViewer (CooldownManager)
         if spellData.glowCooldownManager then
             local cdmFrames = cdmSpellFrameCache[spellID]
             if cdmFrames then
                 for _, frame in ipairs(cdmFrames) do
+                    local cd = frame.Cooldown or frame.cooldown
+                    local onCooldown = cd and cd:IsShown() and not isOnGCD
+                    local shouldGlow = not suppressed and isUsable and not onCooldown
                     if shouldGlow then
                         if not activeGlows[frame] or not addon:HasProcGlow(frame) then
                             activeGlows[frame] = true
@@ -685,6 +737,19 @@ addon.events:HookScript("OnEvent", function(self, event, ...)
             end
         end
         addon:InvalidateAllCaches()
+        addon:CheckAuras()
+        addon:CheckItemCooldowns()
+        addon:CheckSpellCooldowns()
+        -- DB / CDM / third-party frames may not be fully ready at PLAYER_ENTERING_WORLD.
+        -- Wipe any glow shown during the racy initial pass so colors are repainted from the
+        -- (now-valid) DB instead of being frozen by HasProcGlow=true.
+        C_Timer.After(1, function()
+            addon:HideAllGlows()
+            addon:InvalidateAllCaches()
+            addon:CheckAuras()
+            addon:CheckItemCooldowns()
+            addon:CheckSpellCooldowns()
+        end)
         return
     end
     if event == "ACTIONBAR_SLOT_CHANGED" then

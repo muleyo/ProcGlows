@@ -233,6 +233,11 @@ function addon:RebuildTables()
     if self.RebuildItemButtonCache then
         self:RebuildItemButtonCache()
     end
+
+    -- Drop active glows so the next check tick reapplies them with current colors/types
+    if self.HideAllGlows then
+        self:HideAllGlows()
+    end
 end
 
 -- ─── Import / Export helpers ─────────────────────────────────────────────────
@@ -355,7 +360,8 @@ local GLOW_TYPE_VALUES = {
     ["Proc Glow"] = "Proc Glow",
     ["Pixel Glow"] = "Pixel Glow",
     ["Autocast Shine"] = "Autocast Shine",
-    ["Action Button Glow"] = "Action Button Glow"
+    ["Action Button Glow"] = "Action Button Glow",
+    ["Glow Texture"] = "Glow Texture"
 }
 
 -- ─── New-entry scratch state ─────────────────────────────────────────────────
@@ -1041,7 +1047,8 @@ local function GetOptions()
                             ["Proc Glow"] = "Proc Glow",
                             ["Pixel Glow"] = "Pixel Glow",
                             ["Autocast Shine"] = "Autocast Shine",
-                            ["Action Button Glow"] = "Action Button Glow"
+                            ["Action Button Glow"] = "Action Button Glow",
+                            ["Glow Texture"] = "Glow Texture"
                         },
                         get = function()
                             return addon.db.profile.glowType or "Proc Glow"
