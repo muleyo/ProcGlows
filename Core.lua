@@ -36,31 +36,73 @@ local LSM = LibStub("LibSharedMedia-3.0")
 local CUSTOM_BORDER_ATLAS = "UI-HUD-RotationHelper-ProcAltGlow"
 local CUSTOM_BORDER_TEXCOORD = {0.9052734375, 0.953125, 0.10888671875, 0.1328125}
 
+local CUSTOM_BORDER_FADE_DURATION = 0.25
+
 local function CustomBorderGlow_Start(button, color)
-    local tex = button._CustomBorderGlow
-    if not tex then
-        tex = button:CreateTexture(nil, "OVERLAY", nil, 7)
+    local frame = button._CustomBorderGlow
+    if not frame then
+        frame = CreateFrame("Frame", nil, button)
+        frame:SetAllPoints(button)
+        frame:SetFrameLevel(button:GetFrameLevel() + 8)
+
+        local tex = frame:CreateTexture(nil, "OVERLAY", nil, 7)
         local info = C_Texture.GetAtlasInfo(CUSTOM_BORDER_ATLAS)
         if info then
             tex:SetTexture(info.file or info.filename)
             tex:SetTexCoord(unpack(CUSTOM_BORDER_TEXCOORD))
         end
-        tex:SetPoint("TOPLEFT", button, "TOPLEFT", -2.5, 2.5)
-        tex:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 1.5, -1.5)
+        tex:SetPoint("TOPLEFT", frame, "TOPLEFT", -2.5, 2.5)
+        tex:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 1.5, -1.5)
         tex:SetBlendMode("ADD")
-        button._CustomBorderGlow = tex
+        frame.tex = tex
+
+        local fadeIn = frame:CreateAnimationGroup()
+        local aIn = fadeIn:CreateAnimation("Alpha")
+        aIn:SetFromAlpha(0)
+        aIn:SetToAlpha(1)
+        aIn:SetDuration(CUSTOM_BORDER_FADE_DURATION)
+        aIn:SetSmoothing("OUT")
+        fadeIn:SetScript("OnFinished", function() frame:SetAlpha(1) end)
+        frame.fadeIn = fadeIn
+
+        local fadeOut = frame:CreateAnimationGroup()
+        local aOut = fadeOut:CreateAnimation("Alpha")
+        aOut:SetFromAlpha(1)
+        aOut:SetToAlpha(0)
+        aOut:SetDuration(CUSTOM_BORDER_FADE_DURATION)
+        aOut:SetSmoothing("OUT")
+        fadeOut:SetScript("OnFinished", function() frame:Hide() end)
+        frame.fadeOut = fadeOut
+
+        button._CustomBorderGlow = frame
     end
+
     if color then
-        tex:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+        frame.tex:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     else
-        tex:SetVertexColor(1, 1, 1, 1)
+        frame.tex:SetVertexColor(1, 1, 1, 1)
     end
-    tex:Show()
+
+    if frame.fadeOut:IsPlaying() then
+        frame.fadeOut:Stop()
+    end
+    if not frame:IsShown() then
+        frame:SetAlpha(0)
+        frame:Show()
+        frame.fadeIn:Play()
+    elseif not frame.fadeIn:IsPlaying() and frame:GetAlpha() < 1 then
+        frame.fadeIn:Play()
+    end
 end
 
 local function CustomBorderGlow_Stop(button)
-    if button._CustomBorderGlow then
-        button._CustomBorderGlow:Hide()
+    local frame = button._CustomBorderGlow
+    if not frame or not frame:IsShown() then return end
+    if frame.fadeIn:IsPlaying() then
+        frame.fadeIn:Stop()
+    end
+    if not frame.fadeOut:IsPlaying() then
+        frame.fadeOut:Play()
     end
 end
 local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton",
