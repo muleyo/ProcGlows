@@ -33,8 +33,8 @@ local itemCacheDirty = true
 local stackTexts = {}
 local recentSounds = {}
 local LSM = LibStub("LibSharedMedia-3.0")
-local CUSTOM_BORDER_ATLAS = "UI-HUD-RotationHelper-ProcAltGlow"
-local CUSTOM_BORDER_TEXCOORD = {0.9052734375, 0.953125, 0.10888671875, 0.1328125}
+local CUSTOM_BORDER_ATLAS = "ClickCast-Highlight-Spellbook"
+local CUSTOM_BORDER_TEXCOORD = {0.001953125, 0.142578125, 0.451171875, 0.591796875}
 
 local CUSTOM_BORDER_FADE_DURATION = 0.25
 
@@ -42,7 +42,8 @@ local function CustomBorderGlow_Start(button, color)
     local frame = button._CustomBorderGlow
     if not frame then
         frame = CreateFrame("Frame", nil, button)
-        frame:SetAllPoints(button)
+        frame:SetPoint("TOPLEFT", button, "TOPLEFT", -16, 16)
+        frame:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 16, -16)
         frame:SetFrameLevel(button:GetFrameLevel() + 8)
 
         local tex = frame:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -51,8 +52,10 @@ local function CustomBorderGlow_Start(button, color)
             tex:SetTexture(info.file or info.filename)
             tex:SetTexCoord(unpack(CUSTOM_BORDER_TEXCOORD))
         end
-        tex:SetPoint("TOPLEFT", frame, "TOPLEFT", -2.5, 2.5)
-        tex:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 1.5, -1.5)
+        tex:SetAllPoints(frame)
+        tex:SetDesaturated(true)
+        -- tex:SetPoint("TOPLEFT", button.NormalTexture, "TOPLEFT", -2.5, 2.5)
+        -- tex:SetPoint("BOTTOMRIGHT", button.NormalTexture, "BOTTOMRIGHT", 1.5, -1.5)
         tex:SetBlendMode("ADD")
         frame.tex = tex
 
@@ -62,7 +65,9 @@ local function CustomBorderGlow_Start(button, color)
         aIn:SetToAlpha(1)
         aIn:SetDuration(CUSTOM_BORDER_FADE_DURATION)
         aIn:SetSmoothing("OUT")
-        fadeIn:SetScript("OnFinished", function() frame:SetAlpha(1) end)
+        fadeIn:SetScript("OnFinished", function()
+            frame:SetAlpha(1)
+        end)
         frame.fadeIn = fadeIn
 
         local fadeOut = frame:CreateAnimationGroup()
@@ -71,7 +76,9 @@ local function CustomBorderGlow_Start(button, color)
         aOut:SetToAlpha(0)
         aOut:SetDuration(CUSTOM_BORDER_FADE_DURATION)
         aOut:SetSmoothing("OUT")
-        fadeOut:SetScript("OnFinished", function() frame:Hide() end)
+        fadeOut:SetScript("OnFinished", function()
+            frame:Hide()
+        end)
         frame.fadeOut = fadeOut
 
         button._CustomBorderGlow = frame
@@ -97,7 +104,9 @@ end
 
 local function CustomBorderGlow_Stop(button)
     local frame = button._CustomBorderGlow
-    if not frame or not frame:IsShown() then return end
+    if not frame or not frame:IsShown() then
+        return
+    end
     if frame.fadeIn:IsPlaying() then
         frame.fadeIn:Stop()
     end
