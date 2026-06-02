@@ -87,7 +87,7 @@ local function CustomBorderGlow_Start(button, color)
     if color then
         frame.tex:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     else
-        frame.tex:SetVertexColor(1, 1, 1, 1)
+        frame.tex:SetVertexColor(1, 0.7, 0, 1)
     end
 
     if frame.fadeOut:IsPlaying() then
@@ -855,3 +855,48 @@ addon.events:HookScript("OnEvent", function(self, event, ...)
 end)
 
 BuffIconCooldownViewer:HookScript("OnEvent", addon.CheckAuras)
+
+-- ─── Replace Blizzard's spell activation alert ───────────────────────────────
+-- Secure-hook ShowAlert / HideAlert. When the toggle is on, immediately hide
+-- the Blizzard alert frame that Show just created and start our own glow.
+if ActionButtonSpellAlertManager and ActionButtonSpellAlertManager.ShowAlert then
+    local replacedButtons = {}
+    addon._replacedBlizzardProcButtons = replacedButtons
+
+    local function GetBlizzardAlertFrame(self, button)
+        local alertType = self.activeAlerts and self.activeAlerts[button]
+        if alertType == self.SpellAlertType.Default then
+            return button.SpellActivationAlert
+        elseif alertType == self.SpellAlertType.AssistedCombatRotation then
+            local acrf = button.AssistedCombatRotationFrame
+            return acrf and acrf.SpellActivationAlert
+        end
+    end
+
+    hooksecurefunc(ActionButtonSpellAlertManager, "ShowAlert", function(self, button)
+        if not button or not addon.db or not addon.db.profile.replaceBlizzardProc then
+            return
+        end
+        local alertFrame = GetBlizzardAlertFrame(self, button)
+        if alertFrame then
+            alertFrame:Hide()
+        end
+        replacedButtons[button] = true
+        addon:ShowProcGlow(button, nil, nil, nil, nil, addon.db.profile.blizzardProcGlowType or "Proc Glow")
+    end)
+
+    hooksecurefunc(ActionButtonSpellAlertManager, "HideAlert", function(_, button)
+        if button and replacedButtons[button] then
+            replacedButtons[button] = nil
+            addon:HideProcGlow(button)
+        end
+    end)
+end
+
+function addon:ClearReplacedBlizzardProcs()
+    if not addon._replacedBlizzardProcButtons then return end
+    for button in pairs(addon._replacedBlizzardProcButtons) do
+        addon:HideProcGlow(button)
+    end
+    wipe(addon._replacedBlizzardProcButtons)
+end

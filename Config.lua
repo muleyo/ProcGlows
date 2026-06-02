@@ -40,6 +40,8 @@ local defaults = {
         },
         combatOnly = false,
         glowType = "Proc Glow",
+        replaceBlizzardProc = false,
+        blizzardProcGlowType = "Proc Glow",
         hideAnimations = {
             castbar = true
         }
@@ -1057,6 +1059,53 @@ local function GetOptions()
                             addon:HideAllGlows()
                             addon.db.profile.glowType = v
                             addon:InvalidateAllCaches()
+                        end
+                    },
+                    blizzardProcHeader = {
+                        type = "header",
+                        name = "Blizzard Proc Animation",
+                        order = 5
+                    },
+                    replaceBlizzardProc = {
+                        type = "toggle",
+                        name = "Replace Blizzard Proc Animation",
+                        desc = "Override the default yellow spell-activation swirl on action buttons with the glow type below.\n\n|cffff8800Note:|r Enabling/Disabling requires a reload of the UI to take effect.",
+                        order = 6,
+                        width = "full",
+                        get = function()
+                            return addon.db.profile.replaceBlizzardProc
+                        end,
+                        set = function(_, v)
+                            addon.db.profile.replaceBlizzardProc = v
+                            if not v and addon.ClearReplacedBlizzardProcs then
+                                addon:ClearReplacedBlizzardProcs()
+                            end
+                        end
+                    },
+                    blizzardProcGlowType = {
+                        type = "select",
+                        name = "Replacement Glow Type",
+                        desc = "Glow effect used in place of Blizzard's proc animation.",
+                        order = 7,
+                        width = "normal",
+                        disabled = function()
+                            return not addon.db.profile.replaceBlizzardProc
+                        end,
+                        values = {
+                            ["Proc Glow"] = "Proc Glow",
+                            ["Pixel Glow"] = "Pixel Glow",
+                            ["Autocast Shine"] = "Autocast Shine",
+                            ["Action Button Glow"] = "Action Button Glow",
+                            ["Glow Texture"] = "Glow Texture"
+                        },
+                        get = function()
+                            return addon.db.profile.blizzardProcGlowType or "Proc Glow"
+                        end,
+                        set = function(_, v)
+                            addon.db.profile.blizzardProcGlowType = v
+                            if addon.ClearReplacedBlizzardProcs then
+                                addon:ClearReplacedBlizzardProcs()
+                            end
                         end
                     },
                     animHeader = {
