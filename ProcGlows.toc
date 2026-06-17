@@ -1,10 +1,11 @@
-## Interface: 120000, 120001, 120005
+## Interface: 120000, 120001, 120005, 120007
 ## Author: muleyo
 ## Version: @project-version@
 ## Title: |cff009cffmuleyo's|r |cffffd100ProcGlows|r
 ## IconTexture: Interface\Icons\Spell_Holy_SurgeOfLight
 ## X-Curse-Project-ID: 1461238
 ## SavedVariables: muleyoProcGlowDB
+## Category: muleyo AddOns
 
 # Init
 Init.lua
