@@ -38,6 +38,21 @@ local CUSTOM_BORDER_TEXCOORD = {0.001953125, 0.142578125, 0.451171875, 0.5917968
 
 local CUSTOM_BORDER_FADE_DURATION = 0.25
 
+-- GetBaseSpellID() on CooldownViewer item frames returns a secret value in
+-- some game versions, so it can't be used directly as a table key. Resolve it
+-- to one of our own plain spellIDs via equality comparison instead.
+local function ResolvePlainSpellID(secretSpellID, candidates)
+    if not secretSpellID or not candidates then
+        return nil
+    end
+    for spellID in pairs(candidates) do
+        if secretSpellID == spellID then
+            return spellID
+        end
+    end
+    return nil
+end
+
 local function CustomBorderGlow_Start(button, color)
     local frame = button._CustomBorderGlow
     if not frame then
@@ -269,7 +284,7 @@ function addon:ShowProcGlow(button, r, g, b, soundKey, entryGlowType)
         if soundKey and soundKey ~= "None" and not recentSounds[soundKey] then
             local soundFile = LSM:Fetch(LSM.MediaType.SOUND, soundKey, true)
             if soundFile then
-                PlaySoundFile(soundFile, "Master")
+                PlaySoundFile(soundFile, addon.db.profile.soundChannel or "Master")
                 recentSounds[soundKey] = true
                 C_Timer.After(0, function()
                     recentSounds[soundKey] = nil
@@ -345,11 +360,11 @@ function addon:CleanupOrphanedGlows()
         end
     end
     -- Include BuffIconCooldownViewer aura frames that may have icon glows
-    if BuffIconCooldownViewer and BuffIconCooldownViewer.itemFramePool then
+    if BuffIconCooldownViewer and BuffIconCooldownViewer.itemFramePool and addon.Auras then
         for aura in BuffIconCooldownViewer.itemFramePool:EnumerateActive() do
             if aura and aura.GetBaseSpellID then
-                local spellID = aura:GetBaseSpellID()
-                if spellID and addon.Auras and addon.Auras[spellID] then
+                local spellID = ResolvePlainSpellID(aura:GetBaseSpellID(), addon.Auras)
+                if spellID then
                     cached[aura] = true
                 end
             end
@@ -563,9 +578,29 @@ function addon:RebuildCDMSpellFrameCache()
     if not EssentialCooldownViewer or not EssentialCooldownViewer.itemFramePool then
         return
     end
+
+    -- Plain spellIDs we care about matching against CDM frames.
+    local interestingSpellIDs = {}
+    if addon.Spells then
+        for spellID, spellData in pairs(addon.Spells) do
+            if spellData.glowCooldownManager then
+                interestingSpellIDs[spellID] = true
+            end
+        end
+    end
+    if addon.Auras then
+        for _, entries in pairs(addon.Auras) do
+            for _, auraData in ipairs(entries) do
+                if auraData.glowCooldownManager and auraData.anchorSpellID then
+                    interestingSpellIDs[auraData.anchorSpellID] = true
+                end
+            end
+        end
+    end
+
     for frame in EssentialCooldownViewer.itemFramePool:EnumerateActive() do
         if frame and frame.GetBaseSpellID then
-            local spellID = frame:GetBaseSpellID()
+            local spellID = ResolvePlainSpellID(frame:GetBaseSpellID(), interestingSpellIDs)
             if spellID then
                 if not cdmSpellFrameCache[spellID] then
                     cdmSpellFrameCache[spellID] = {}
@@ -584,7 +619,7 @@ function addon:CheckAuras()
     local suppressed = addon:IsCombatOnly()
 
     for aura in BuffIconCooldownViewer.itemFramePool:EnumerateActive() do
-        local spellID = aura:GetBaseSpellID()
+        local spellID = ResolvePlainSpellID(aura:GetBaseSpellID(), addon.Auras)
         local entries = spellID and addon.Auras[spellID]
         if entries then
             -- shouldShow: hide aura if ALL entries say not to show
