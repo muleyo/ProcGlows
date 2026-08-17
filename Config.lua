@@ -39,6 +39,7 @@ local defaults = {
             -- each entry: { color = {r,g,b} }
         },
         combatOnly = false,
+        soundChannel = "Master",
         glowType = "Proc Glow",
         replaceBlizzardProc = false,
         blizzardProcGlowType = "Proc Glow",
@@ -1059,6 +1060,26 @@ local function GetOptions()
                             addon:HideAllGlows()
                             addon.db.profile.glowType = v
                             addon:InvalidateAllCaches()
+                        end
+                    },
+                    soundChannel = {
+                        type = "select",
+                        name = "Proc Sound Channel",
+                        desc = "Which sound channel proc sounds are played on.",
+                        order = 3,
+                        width = "normal",
+                        values = {
+                            ["Master"] = "Master",
+                            ["SFX"] = "Sound Effects",
+                            ["Ambience"] = "Ambience",
+                            ["Music"] = "Music",
+                            ["Dialog"] = "Dialog"
+                        },
+                        get = function()
+                            return addon.db.profile.soundChannel or "Master"
+                        end,
+                        set = function(_, v)
+                            addon.db.profile.soundChannel = v
                         end
                     },
                     blizzardProcHeader = {
