@@ -38,13 +38,15 @@ local CUSTOM_BORDER_TEXCOORD = {0.001953125, 0.142578125, 0.451171875, 0.5917968
 
 local CUSTOM_BORDER_FADE_DURATION = 0.25
 
--- GetBaseSpellID() on CooldownViewer item frames returns a secret value in
--- some game versions, so it can't be used directly as a table key. Resolve it
--- to one of our own plain spellIDs via equality comparison instead.
 local function ResolvePlainSpellID(secretSpellID, candidates)
+    if secretSpellID ~= nil and issecretvalue(secretSpellID) then
+        return nil
+    end
+
     if not secretSpellID or not candidates then
         return nil
     end
+
     for spellID in pairs(candidates) do
         if secretSpellID == spellID then
             return spellID
