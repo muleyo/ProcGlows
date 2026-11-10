@@ -16,6 +16,7 @@ addon.events:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
 addon.events:RegisterEvent("UPDATE_VEHICLE_ACTIONBAR")
 addon.events:RegisterEvent("BAG_UPDATE_COOLDOWN")
 addon.events:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
+addon.events:RegisterEvent("ACTIONBAR_PAGE_CHANGED")
 
 local itemSlotCache = {}
 local LCG = LibStub("LibCustomGlow-1.0", true)
@@ -137,9 +138,18 @@ local MAX_ACTION_SLOT = 180
 
 -- ─── Third-party action bar support (Bartender4, Dominos, ElvUI) ─────────────
 
--- Returns the action slot for both Blizzard (.action) and LAB-based (._state_action) buttons
+-- Returns the action slot for Blizzard, LAB-based, and attribute-driven buttons.
 local function GetButtonActionSlot(button)
-    return button._state_action or button.action
+    if button._state_action ~= nil then
+        return button._state_action
+    end
+    if button.GetAttribute then
+        local action = button:GetAttribute("action")
+        if action ~= nil then
+            return action
+        end
+    end
+    return button.action
 end
 
 local thirdPartyButtons = {}
@@ -206,6 +216,15 @@ local function CollectThirdPartyButtons()
         end
     end
 
+    -- EllesmereUI Action Bars (EABButton1 through EABButton180)
+    for i = 1, MAX_ACTION_SLOT do
+        local btn = _G["EABButton" .. i]
+        if btn and not seen[btn] then
+            seen[btn] = true
+            thirdPartyButtons[#thirdPartyButtons + 1] = btn
+        end
+    end
+
     thirdPartyDirty = false
 end
 
@@ -215,7 +234,8 @@ local STACK_FONT_SIZE = 20
 local STACK_FONT_FLAGS = "OUTLINE"
 
 function addon:ShowStackCount(frame, count)
-    if not count then
+    local countIsSecret = issecretvalue and issecretvalue(count)
+    if not countIsSecret and not count then
         addon:HideStackCount(frame)
         return
     end
@@ -424,7 +444,7 @@ function addon:FindButtonsForSlot(slot)
             end
         end
     end
-    -- Third-party action bar addons (Bartender4, Dominos, ElvUI)
+    -- Third-party action bar addons (Bartender4, Dominos, ElvUI, EllesmereUI)
     if thirdPartyDirty then
         CollectThirdPartyButtons()
     end
@@ -820,7 +840,8 @@ end
 -- Hooks
 addon.events:HookScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event ==
-        "UPDATE_OVERRIDE_ACTIONBAR" or event == "UPDATE_BONUS_ACTIONBAR" or event == "UPDATE_VEHICLE_ACTIONBAR" then
+        "UPDATE_OVERRIDE_ACTIONBAR" or event == "UPDATE_BONUS_ACTIONBAR" or event == "UPDATE_VEHICLE_ACTIONBAR" or event ==
+        "ACTIONBAR_PAGE_CHANGED" then
         -- Rebuild the slot snapshot so ACTIONBAR_SLOT_CHANGED can detect real changes
         wipe(actionSlotSnapshot)
         for s = 1, MAX_ACTION_SLOT do
