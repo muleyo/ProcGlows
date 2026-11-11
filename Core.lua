@@ -34,7 +34,7 @@ local stackTexts = {}
 local recentSounds = {}
 local LSM = LibStub("LibSharedMedia-3.0")
 local CUSTOM_BORDER_ATLAS = "ClickCast-Highlight-Spellbook"
-local CUSTOM_BORDER_TEXCOORD = {0.001953125, 0.142578125, 0.451171875, 0.591796875}
+local CUSTOM_BORDER_TEXCOORD = { 0.001953125, 0.142578125, 0.451171875, 0.591796875 }
 
 local CUSTOM_BORDER_FADE_DURATION = 0.25
 
@@ -131,11 +131,12 @@ local function CustomBorderGlow_Stop(button)
         frame.fadeOut:Play()
     end
 end
-local BUTTON_PREFIXES = {"ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton",
-                         "MultiBar5Button", "MultiBar6Button", "MultiBar7Button", "MultiBar8Button"}
+local BUTTON_PREFIXES = { "ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
+    "MultiBarLeftButton",
+    "MultiBar5Button", "MultiBar6Button", "MultiBar7Button", "MultiBar8Button" }
 local MAX_ACTION_SLOT = 180
 
--- ─── Third-party action bar support (Bartender4, Dominos, ElvUI) ─────────────
+-- ─── Third-party action bar support (Bartender4, Dominos, ElvUI, EllesmereUI) ─
 
 -- Returns the action slot for both Blizzard (.action) and LAB-based (._state_action) buttons
 local function GetButtonActionSlot(button)
@@ -160,7 +161,7 @@ local function CollectThirdPartyButtons()
         end
     end
 
-    -- Bartender4  (BT4Button1 … BT4Button180, up to 15 bars × 12 buttons)
+    -- Bartender4
     if _G["Bartender4"] then
         for i = 1, 180 do
             local btn = _G["BT4Button" .. i]
@@ -171,7 +172,7 @@ local function CollectThirdPartyButtons()
         end
     end
 
-    -- Dominos  (DominosActionButton1 … DominosActionButton168)
+    -- Dominos
     if _G["Dominos"] then
         for i = 1, 168 do
             local btn = _G["DominosActionButton" .. i]
@@ -200,6 +201,17 @@ local function CollectThirdPartyButtons()
     if LAB_Elv and LAB_Elv.GetAllButtons then
         for btn in pairs(LAB_Elv:GetAllButtons()) do
             if not seen[btn] then
+                seen[btn] = true
+                thirdPartyButtons[#thirdPartyButtons + 1] = btn
+            end
+        end
+    end
+
+    -- EllesmereUI Action Bars
+    if _G["EllesmereUI"] then
+        for slot = 1, MAX_ACTION_SLOT do
+            local btn = _G["EABButton" .. slot]
+            if btn and not seen[btn] then
                 seen[btn] = true
                 thirdPartyButtons[#thirdPartyButtons + 1] = btn
             end
@@ -239,17 +251,18 @@ function addon:HideStackCount(frame)
 end
 
 function addon:ShowProcGlow(button, r, g, b, soundKey, entryGlowType)
-    local glowType = entryGlowType and entryGlowType ~= "Default" and entryGlowType or (self.db and self.db.profile.glowType or "Proc Glow")
-    local color = r and {r, g, b, 1} or nil
+    local glowType = entryGlowType and entryGlowType ~= "Default" and entryGlowType or
+    (self.db and self.db.profile.glowType or "Proc Glow")
+    local color = r and { r, g, b, 1 } or nil
 
     if glowType == "Proc Glow" then
         if not LCG.ProcGlow_Start then
             if not lcgWarnedOnce then
                 lcgWarnedOnce = true
                 print("|cffff4444ProcGlows:|r LibCustomGlow did not fully initialize (ProcGlow_Start is missing). " ..
-                          "This is likely caused by a conflicting addon or a WoW build incompatibility with " ..
-                          "the embedded LibCustomGlow-1.0 (version " .. (LCG.minor or "?") .. "). " ..
-                          "Glows will not display until this is resolved.")
+                    "This is likely caused by a conflicting addon or a WoW build incompatibility with " ..
+                    "the embedded LibCustomGlow-1.0 (version " .. (LCG.minor or "?") .. "). " ..
+                    "Glows will not display until this is resolved.")
             end
             return
         end
@@ -424,7 +437,7 @@ function addon:FindButtonsForSlot(slot)
             end
         end
     end
-    -- Third-party action bar addons (Bartender4, Dominos, ElvUI)
+    -- Third-party action bar addons (Bartender4, Dominos, ElvUI, EllesmereUI)
     if thirdPartyDirty then
         CollectThirdPartyButtons()
     end
@@ -651,7 +664,8 @@ function addon:CheckAuras()
                         if iconGlowData.useDefaultColor then
                             addon:ShowProcGlow(aura, nil, nil, nil, iconGlowData.procSound, iconGlowData.glowType)
                         else
-                            addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g, iconGlowData.color.b, iconGlowData.procSound,
+                            addon:ShowProcGlow(aura, iconGlowData.color.r, iconGlowData.color.g, iconGlowData.color.b,
+                                iconGlowData.procSound,
                                 iconGlowData.glowType)
                         end
                     end
@@ -676,7 +690,8 @@ function addon:CheckAuras()
                                 if auraData.useDefaultColor then
                                     addon:ShowProcGlow(button, nil, nil, nil, auraData.procSound, auraData.glowType)
                                 else
-                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b, auraData.procSound,
+                                    addon:ShowProcGlow(button, auraData.color.r, auraData.color.g, auraData.color.b,
+                                        auraData.procSound,
                                         auraData.glowType)
                                 end
                             end
@@ -701,7 +716,8 @@ function addon:CheckAuras()
                                     if auraData.useDefaultColor then
                                         addon:ShowProcGlow(frame, nil, nil, nil, auraData.procSound, auraData.glowType)
                                     else
-                                        addon:ShowProcGlow(frame, auraData.color.r, auraData.color.g, auraData.color.b, auraData.procSound,
+                                        addon:ShowProcGlow(frame, auraData.color.r, auraData.color.g, auraData.color.b,
+                                            auraData.procSound,
                                             auraData.glowType)
                                     end
                                 end
@@ -740,7 +756,8 @@ function addon:CheckItemCooldowns()
                         if item.useDefaultColor then
                             addon:ShowProcGlow(button, nil, nil, nil, item.procSound, item.glowType)
                         else
-                            addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b, item.procSound, item.glowType)
+                            addon:ShowProcGlow(button, item.color.r, item.color.g, item.color.b, item.procSound,
+                                item.glowType)
                         end
                     end
                 else
@@ -774,7 +791,8 @@ function addon:CheckSpellCooldowns()
                         if spellData.useDefaultColor then
                             addon:ShowProcGlow(button, nil, nil, nil, spellData.procSound, spellData.glowType)
                         else
-                            addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b, spellData.procSound,
+                            addon:ShowProcGlow(button, spellData.color.r, spellData.color.g, spellData.color.b,
+                                spellData.procSound,
                                 spellData.glowType)
                         end
                     end
@@ -801,7 +819,8 @@ function addon:CheckSpellCooldowns()
                             if spellData.useDefaultColor then
                                 addon:ShowProcGlow(frame, nil, nil, nil, spellData.procSound, spellData.glowType)
                             else
-                                addon:ShowProcGlow(frame, spellData.color.r, spellData.color.g, spellData.color.b, spellData.procSound,
+                                addon:ShowProcGlow(frame, spellData.color.r, spellData.color.g, spellData.color.b,
+                                    spellData.procSound,
                                     spellData.glowType)
                             end
                         end
